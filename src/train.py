@@ -18,7 +18,7 @@ device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dir", required=True, help="Dataset directory.")
-    parser.add_argument("--n_epochs", type=int, default=100, help="number of epochs of training")
+    parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
     parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
     parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
     parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -34,13 +34,14 @@ def parse_args():
 
 def init_directory(dir, tag=""):
     basedir = os.path.split(os.path.split(dir)[0])[0]
-    modeldir = join(basedir, 'model_'+tag)
-    checkpointdir = join(basedir, 'checkpoint_'+tag)
+    modeldir = join(basedir, 'model_' + tag)
+    checkpointdir = join(basedir, 'checkpoint_' + tag)
     if not os.path.exists(modeldir):
         os.makedirs(modeldir)
     if not os.path.exists(checkpointdir):
         os.makedirs(checkpointdir)
     return modeldir, checkpointdir
+
 
 if __name__ == '__main__':
     # argumments
@@ -51,6 +52,7 @@ if __name__ == '__main__':
 
     # Configure data loader
     X, y = utils.loadDataset(args.dir)
+    np.save(join(checkpointdir,"real.npy"), X)
     logger.info("Loaded dataset:{}, min burst:{} max burst:{}".format(X.shape, X.min(), X.max()))
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)
@@ -61,7 +63,7 @@ if __name__ == '__main__':
     assert seq_len > 1
     assert class_dim > 1
     logger.info("X shape {}, y shape {}, class num: {}".format(X.shape, y.shape, class_dim))
-    dataset = Data.TensorDataset(X,y)
+    dataset = Data.TensorDataset(X, y)
     dataloader = torch.utils.data.DataLoader(
         dataset=dataset,
         num_workers=args.n_cpu,
@@ -72,7 +74,7 @@ if __name__ == '__main__':
     # Initialize generator and discriminator
     generator = Generator(seq_len, class_dim, args.latent_dim)
     discriminator = Discriminator(seq_len, class_dim)
-    if cuda:
+    if torch.cuda.is_available():
         generator.cuda()
         discriminator.cuda()
 
@@ -105,13 +107,14 @@ if __name__ == '__main__':
             # Sample noise as generator input
             z = Variable(Tensor(np.random.normal(0, 1, (traces.shape[0], args.latent_dim))))
             # Generate a batch of traces
-            fake_traces = generator(z,c)
+            fake_traces = generator(z, c)
             # Real traces
             real_validity = discriminator(real_traces, c)
             # Fake traces
             fake_validity = discriminator(fake_traces, c)
             # Gradient penalty
-            gradient_penalty = utils.compute_gradient_penalty(discriminator, real_traces.data, fake_traces.data, c, Tensor)
+            gradient_penalty = utils.compute_gradient_penalty(discriminator, real_traces.data, fake_traces.data, c,
+                                                              Tensor)
             # Adversarial loss
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + cm.lambda_gp * gradient_penalty
 
@@ -129,7 +132,7 @@ if __name__ == '__main__':
                 # -----------------
 
                 # Generate a batch of traces
-                fake_traces = generator(z,c)
+                fake_traces = generator(z, c)
                 total_real.extend(traces.cpu().numpy())
                 total_fake.extend(fake_traces.detach().cpu().numpy())
                 total_c.extend(c.detach().cpu().numpy())
@@ -154,7 +157,8 @@ if __name__ == '__main__':
             total_c = np.array(total_c).argmax(axis=1)
             total_real = scaler.inverse_transform(total_real)
             total_fake = scaler.inverse_transform(total_fake)
-            logger.info("Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()), int(total_fake.max())))
+            logger.info("Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()),
+                                                                             int(total_fake.max())))
             np.save(join(checkpointdir, "epoch_{}.npy".format(epoch + 1)),
                     {'x': total_real, 'recon_x': total_fake, 'label': total_c})
         loss_checkpoints['generator'].append(generator_loss_epoch)
@@ -166,9 +170,17 @@ if __name__ == '__main__':
     logger.info("Model saved at {}".format(modeldir))
 
     with torch.no_grad():
-        # generate some examples
-        z = Variable(Tensor(np.random.normal(0, 1, (class_dim, args.latent_dim))))
-        c = Variable(Tensor(np.eye(class_dim,class_dim)))
-        sample = generator(z,c).cpu().numpy()
-        sample = scaler.inverse_transform(sample)
-        np.save(join(checkpointdir, "examples.npy"), sample)
+        batch_size = args.batch_size * 2
+        # generate some examples for each batch
+        samples = []
+        for cls in range(class_dim):
+            z = Variable(Tensor(np.random.normal(0, 1, (batch_size, args.latent_dim))))
+            tmp = np.zeros((batch_size, class_dim))
+            tmp[:,cls] = 1
+            c = Variable(Tensor(tmp))
+            sample = generator(z, c).cpu().numpy()
+            sample = scaler.inverse_transform(sample)
+            samples.append(sample)
+        samples = np.round(np.array(samples)).astype(int)
+        logger.info("fake shape:{}".format(samples.shape))
+        np.save(join(checkpointdir, "fake.npy"), samples)

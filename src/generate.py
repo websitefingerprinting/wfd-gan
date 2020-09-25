@@ -17,7 +17,7 @@ debug_file = 0
 
 def parse_args():
     # initialize logger
-    logger = utils.init_logger("def")
+    logger = utils.init_logger("GAN Train")
     # read in args
     parser = argparse.ArgumentParser(description='Create defended trace based on trained GAN.')
     parser.add_argument('--train',
