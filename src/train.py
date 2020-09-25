@@ -52,7 +52,6 @@ if __name__ == '__main__':
 
     # Configure data loader
     X, y = utils.loadDataset(args.dir)
-    np.save(join(checkpointdir,"real.npy"), X)
     logger.info("Loaded dataset:{}, min burst:{} max burst:{}".format(X.shape, X.min(), X.max()))
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)
@@ -173,6 +172,7 @@ if __name__ == '__main__':
         batch_size = args.batch_size * 2
         # generate some examples for each batch
         samples = []
+        labels = []
         for cls in range(class_dim):
             z = Variable(Tensor(np.random.normal(0, 1, (batch_size, args.latent_dim))))
             tmp = np.zeros((batch_size, class_dim))
@@ -180,7 +180,10 @@ if __name__ == '__main__':
             c = Variable(Tensor(tmp))
             sample = generator(z, c).cpu().numpy()
             sample = scaler.inverse_transform(sample)
-            samples.append(sample)
+            samples.extend(sample)
+            labels.extend([cls]*batch_size)
         samples = np.round(np.array(samples)).astype(int)
-        logger.info("fake shape:{}".format(samples.shape))
-        np.save(join(checkpointdir, "fake.npy"), samples)
+        labels = np.array(labels)
+        fake_dict = {"feature":samples, "label":labels}
+        logger.info("fake shape:{} labels:{}".format(samples.shape, labels.shape))
+        np.save(join(checkpointdir, "fake.npy"), fake_dict)

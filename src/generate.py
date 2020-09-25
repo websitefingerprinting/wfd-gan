@@ -156,7 +156,6 @@ if __name__ == '__main__':
 
     # load model
     model = Generator(seq_len, class_dim, args.latent_dim).to(device)
-    logger.info(seq_len, class_dim, args.latent_dim)
     model.load_state_dict(torch.load(args.model, map_location=device))
     logger.info("Model loaded.")
 
