@@ -7,6 +7,8 @@ from model import *
 import torch.utils.data as Data
 import os
 from os.path import join
+from sklearn import preprocessing
+
 from torchsummaryX import summary
 
 cuda = True if torch.cuda.is_available() else False
@@ -24,6 +26,7 @@ def parse_args():
     parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
     parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
     parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
+    parser.add_argument("--freq", type=int, default=20, help="Checkpoint every freq epochs")
     args = parser.parse_args()
     logger = utils.init_logger('gan')
     return args, logger
@@ -47,7 +50,12 @@ if __name__ == '__main__':
     modeldir, checkpointdir = init_directory(args.dir)
 
     # Configure data loader
-    X, y, scaler = utils.loadDataset(args.dir)
+    X, y = utils.loadDataset(args.dir)
+    logger.info("Loaded dataset:{}, min burst:{} max burst:{}".format(X.shape, X.min(), X.max()))
+    scaler = preprocessing.MinMaxScaler()
+    X = scaler.fit_transform(X)
+    X = torch.from_numpy(X)
+    y = torch.from_numpy(y)
     class_dim = y.max() + 1
     seq_len = X.size(1)
     assert seq_len > 1
@@ -139,14 +147,14 @@ if __name__ == '__main__':
             "[Epoch %2d/%2d] [D loss: %.4f] [G loss: %.4f] [w dist: %.4f]"
             % (epoch + 1, args.n_epochs, discriminator_loss_epoch, generator_loss_epoch, w_dist_epoch)
         )
-        if (epoch == 0) or (epoch + 1) % 10 == 0:
+        if (epoch == 0) or (epoch + 1) % args.freq == 0:
             # every 10 epoch, checkpoint
             total_real = np.array(total_real)
             total_fake = np.array(total_fake)
-            total_c = np.array(total_c)
+            total_c = np.array(total_c).argmax(axis=1)
             total_real = scaler.inverse_transform(total_real)
             total_fake = scaler.inverse_transform(total_fake)
-            logger.info("Get {} samples, max val:{}, min val: {}".format(total_fake.shape[0], int(total_fake.max()), int(total_fake.min())))
+            logger.info("Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()), int(total_fake.max())))
             np.save(join(checkpointdir, "epoch_{}.npy".format(epoch + 1)),
                     {'x': total_real, 'recon_x': total_fake, 'label': total_c})
         loss_checkpoints['generator'].append(generator_loss_epoch)

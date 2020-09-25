@@ -5,7 +5,6 @@ import numpy as np
 import logging
 import configparser
 import common as cm
-from sklearn import preprocessing
 
 
 '''For common usage'''
@@ -59,8 +58,4 @@ def loadDataset(dir):
        y: (num, )'''
     data = np.load(dir, allow_pickle=True).item()
     X, y = data['feature'], data['label']
-    scaler = preprocessing.MinMaxScaler()
-    X = scaler.fit_transform(X)
-    X = torch.from_numpy(X)
-    y = torch.from_numpy(y)
-    return X, y, scaler
+    return X, y
