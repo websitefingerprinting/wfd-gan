@@ -132,11 +132,11 @@ def syn(fdir):
         elif cur_pkt<0 and last_pkt<0:
             cdf_type = 'i2i'
         ipt = sampler.sample(cdf_type)
-        print("Fname:{} Current idx:{}, sampled ipt:{:.6f}, cdf_type:{}, pktseq:{}->{}".format(fname, i, ipt, cdf_type,last_pkt, cur_pkt ))
+        # print("Fname:{} Current idx:{}, sampled ipt:{:.6f}, cdf_type:{}, pktseq:{}->{}".format(fname, i, ipt, cdf_type,last_pkt, cur_pkt ))
 
         assert ipt >= 0
         t += ipt
-        syn_trace.append([t,i])
+        syn_trace.append([t,cur_pkt])
     with open(fdir, 'w') as f:
         for pkt in syn_trace:
             f.write("{:.4f}\t{}\n".format(pkt[0], int(pkt[1])))
