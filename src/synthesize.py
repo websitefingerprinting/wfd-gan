@@ -37,8 +37,8 @@ class IPT_SAMPLER:
     def sample_(self, cdf_index):
         x, cdf = self.cdfs[cdf_index]
         y = np.random.uniform(0, 1)
-        y0, y1 = cdf[cdf < y][-1], cdf[cdf >= y][0]
-        x0, x1 = x[cdf < y][-1], x[cdf >= y][0]
+        y0, y1 = cdf[cdf <= y][-1], cdf[cdf >= y][0]
+        x0, x1 = x[cdf <= y][-1], x[cdf >= y][0]
         if y0 == y1:
             return 10 ** ((x0 + x1) / 2)
         else:
