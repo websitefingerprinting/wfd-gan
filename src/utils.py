@@ -2,6 +2,7 @@ import torch
 from torch.autograd import Variable
 import torch.autograd as autograd
 import numpy as np
+import pandas as pd
 import logging
 import configparser
 import common as cm
@@ -59,3 +60,9 @@ def loadDataset(dir):
     data = np.load(dir, allow_pickle=True).item()
     X, y = data['feature'], data['label']
     return X, y
+
+def loadTrace(fdir):
+    with open(fdir,'r') as f:
+        tmp = f.readlines()
+    trace = np.array(pd.Series(tmp).str.slice(0,-1).str.split("\t",expand=True).astype(float))
+    return trace
