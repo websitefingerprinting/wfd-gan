@@ -82,7 +82,6 @@ def tunnel_defense(fdir):
                 if len(original_out_trace) == 0 or original_out_trace[0] > cur_t:
                     # no data to send or has not come yet
                     defended_trace.append([cur_t, DUMMY_CODE])
-                    print(defended_trace[-1])
                 else:
                     assert original_out_trace[0] <= cur_t
                     defended_trace.append([cur_t, 1])
