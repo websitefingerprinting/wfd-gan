@@ -8,6 +8,7 @@ import torch.utils.data as Data
 import os
 from os.path import join
 from sklearn import preprocessing
+import joblib
 
 from torchsummaryX import summary
 
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     X = scaler.fit_transform(X)
     X = torch.from_numpy(X)
     y = torch.from_numpy(y)
-    class_dim = y.max() + 1
+    class_dim = y.max() + 1 # index start from 0
     seq_len = X.size(1)
     assert seq_len > 1
     assert class_dim > 1
@@ -164,26 +165,28 @@ if __name__ == '__main__':
         loss_checkpoints['discriminator'].append(discriminator_loss_epoch)
         loss_checkpoints['dist'].append(w_dist_epoch)
     np.save(join(checkpointdir, "loss.npy".format(loss_checkpoints)), loss_checkpoints)
-    torch.save(generator.state_dict(), join(modeldir, 'generator_latentdim{}.ckpt'.format(args.latent_dim)))
+    torch.save(generator.state_dict(), join(modeldir, 'generator_seqlen{}_cls{}_latentdim{}.ckpt'.format(seq_len, class_dim, args.latent_dim)))
     torch.save(discriminator.state_dict(), join(modeldir, 'discriminator.ckpt'))
     logger.info("Model saved at {}".format(modeldir))
-
-    with torch.no_grad():
-        batch_size = args.batch_size * 2
-        # generate some examples for each batch
-        samples = []
-        labels = []
-        for cls in range(class_dim):
-            z = Variable(Tensor(np.random.normal(0, 1, (batch_size, args.latent_dim))))
-            tmp = np.zeros((batch_size, class_dim))
-            tmp[:,cls] = 1
-            c = Variable(Tensor(tmp))
-            sample = generator(z, c).cpu().numpy()
-            sample = scaler.inverse_transform(sample)
-            samples.extend(sample)
-            labels.extend([cls]*batch_size)
-        samples = np.round(np.array(samples)).astype(int)
-        labels = np.array(labels)
-        fake_dict = {"feature":samples, "label":labels}
-        logger.info("fake shape:{} labels:{}".format(samples.shape, labels.shape))
-        np.save(join(checkpointdir, "fake.npy"), fake_dict)
+    joblib.dump(scaler, join(modeldir,'scaler.gz'))
+    logger.info("Scaler saved at {}".format(modeldir))
+    # generator.eval()
+    # with torch.no_grad():
+    #     batch_size = args.batch_size
+    #     # generate some examples for each batch
+    #     samples = []
+    #     labels = []
+    #     for cls in range(class_dim):
+    #         z = Variable(Tensor(np.random.normal(0, 1, (batch_size, args.latent_dim))))
+    #         tmp = np.zeros((batch_size, class_dim))
+    #         tmp[:,cls] = 1
+    #         c = Variable(Tensor(tmp))
+    #         sample = generator(z, c).cpu().numpy()
+    #         sample = scaler.inverse_transform(sample)
+    #         samples.extend(sample)
+    #         labels.extend([cls]*batch_size)
+    #     samples = np.round(np.array(samples)).astype(int)
+    #     labels = np.array(labels)
+    #     fake_dict = {"feature":samples, "label":labels}
+    #     logger.info("fake shape:{} labels:{}".format(samples.shape, labels.shape))
+    #     np.save(join(checkpointdir, "fake.npy"), fake_dict)
