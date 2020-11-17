@@ -19,12 +19,12 @@ def parse_arguments():
                         help='Path to the directory with the traffic traces to be simulated.')
     parser.add_argument('--length',
                         type=int,
-                        default=500,
+                        default=1200,
                         help='Pad to length.'
                         )
     parser.add_argument('--format',
                         metavar='<file suffix>',
-                        default=".cell",
+                        default=".burst",
                         )
     parser.add_argument('--save_txt',
                         action='store_true',
@@ -64,21 +64,23 @@ def extract(x):
     cnt = 0
     for e in x:
         if np.sign(e) == sign:
-            cnt += 1
+            cnt += abs(e)
         else:
             new_x.append(cnt)
-            cnt = 1
+            cnt = abs(e)
             sign = np.sign(e)
     new_x.append(cnt)
-
+    new_x.insert(0,len(new_x))
     new_x = new_x[:length] + [0] * (length - len(new_x))
     assert len(new_x) == length
     return new_x
 
 
 def parallel(flist, n_jobs=20):
-    pool = mp.Pool(n_jobs)
-    res = pool.map(extractfeature, flist)
+    with mp.Pool(n_jobs) as p:
+        res = p.map(extractfeature, flist)
+        p.close()
+        p.join()
     return res
 
 
@@ -98,7 +100,7 @@ if __name__ == '__main__':
     global MON_SITE_NUM, length
     # parser config and arguments
     args = parse_arguments()
-    length = args.length
+    length = args.length + 1 # add another feature as the real length of the trace
     logger.info("Arguments: %s" % (args))
     outputdir = join(cm.outputdir, os.path.split(args.dir.rstrip('/'))[1], 'feature')
     if not os.path.exists(outputdir):
@@ -126,9 +128,7 @@ if __name__ == '__main__':
         if os.path.exists(os.path.join(args.dir, str(i) + args.format)):
             flist.append(os.path.join(args.dir, str(i) + args.format))
 
-    res = parallel(flist, n_jobs=20)
-    raw_data_dict = [i for i in res if i]
-    logger.info("After removal: {}/{}".format(len(raw_data_dict), len(flist)))
+    raw_data_dict = parallel(flist, n_jobs=20)
     features, labels = zip(*raw_data_dict)
     features = np.array(features)
     labels = np.array(labels)
@@ -142,5 +142,5 @@ if __name__ == '__main__':
                 # feature = feature.argmax(axis=1)
                 end = np.where(np.array(feature) > 0)[0][-1]  # last one
                 for pkt in feature[:end]:
-                    f.write("{:d} ".format(pkt))
-                f.write("{:d}\n".format(feature[end]))
+                    f.write("{:.0f} ".format(pkt))
+                f.write("{:.0f}\n".format(feature[end]))
