@@ -89,24 +89,27 @@ def sim_wt(fdir):
 
     cur_sign = 1
     cur_time = original_trace[start_ind,0]
+    cur_burst_size = 0
     for i, pkt in enumerate(original_trace[start_ind:]):
         if np.sign(pkt[1]) == cur_sign:
             res_trace.append(pkt)
             cur_time = pkt[0]
+            cur_burst_size += 1
         else:
             # pad fake burst
             if len(syn_burst) > 0 :
                 dummy_num = syn_burst[0]
-                for _ in range(dummy_num):
+                for _ in range(max(dummy_num-cur_burst_size,0)):
                     res_trace.append([cur_time, cur_sign*DUMMY_CODE])
             syn_burst = syn_burst[1:]
 
             cur_sign = np.sign(pkt[1])
             cur_time = pkt[0]
+            cur_burst_size = 1
             res_trace.append(pkt)
     if len(syn_burst) > 0:
         dummy_num = syn_burst[0]
-        for _ in range(dummy_num):
+        for _ in range(max(dummy_num-cur_burst_size, 0)):
             res_trace.append([cur_time,cur_sign*DUMMY_CODE])
     res_trace_np = np.array(res_trace)
     assert len(np.where(abs(res_trace_np[:,1]) == 1)[0]) == len(original_trace)
