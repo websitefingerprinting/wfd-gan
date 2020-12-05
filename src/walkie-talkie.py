@@ -159,6 +159,6 @@ if __name__ == '__main__':
         fdir = join(args.dir, str(i)+args.format)
         flist.append(fdir)
     logger.info("Outputdir:{}, generate {} traces.".format(outputdir, len(flist)))
-    parallel(flist[:2])
+    parallel(flist)
     # for f in flist[:1]:
     #     sim_wt(f)
