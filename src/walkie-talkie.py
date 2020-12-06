@@ -157,10 +157,12 @@ if __name__ == '__main__':
     for i in range(MON_SITE_NUM):
         for j in range(MON_INST_NUM):
             fdir = join(args.dir, str(i)+'-'+str(j)+args.format)
-            flist.append(fdir)
+            if os.path.exists(fdir):
+                flist.append(fdir)
     for i in range(UNMON_SITE_NUM):
         fdir = join(args.dir, str(i)+args.format)
-        flist.append(fdir)
+        if os.path.exists(fdir):
+            flist.append(fdir)
     logger.info("Outputdir:{}, generate {} traces.".format(outputdir, len(flist)))
     parallel(flist)
     # for f in flist[:1]:
