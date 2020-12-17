@@ -94,8 +94,6 @@ if __name__ == '__main__':
         res[1].extend(o2i)
         res[2].extend(i2o)
         res[3].extend(i2i)
-    for i in range(4):
-        res[i] = np.log10(res[i])
     np.save(join(outputdir, 'ipt.npy'), res)
     logger.info("Extract o2o {}, o2i {}, i2o {}, i2i {}.".format(len(o2o), len(o2i), len(i2o), len(i2i)))
     # logger.info("KDE modeling...")
