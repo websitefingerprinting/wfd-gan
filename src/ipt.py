@@ -86,7 +86,7 @@ if __name__ == '__main__':
             flist.append(os.path.join(args.dir, str(i) + args.format))
 
     res = {'o2o':[],'o2i':[],'i2o':[],'i2i':[]}
-    for i, f in enumerate(flist[:2]):
+    for i, f in enumerate(flist[:]):
         if i % 1000 == 0:
             logger.info("Processing {}/{}".format(i,len(flist)))
         o2o, o2i, i2o, i2i = parse(f)
