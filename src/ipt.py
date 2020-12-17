@@ -85,17 +85,21 @@ if __name__ == '__main__':
         if os.path.exists(os.path.join(args.dir, str(i) + args.format)):
             flist.append(os.path.join(args.dir, str(i) + args.format))
 
-    res = [[],[],[],[]]
-    for i, f in enumerate(flist):
+    res = {'o2o':[],'o2i':[],'i2o':[],'i2i':[]}
+    for i, f in enumerate(flist[:2]):
         if i % 1000 == 0:
-            print(i)
+            logger.info("Processing {}/{}".format(i,len(flist)))
         o2o, o2i, i2o, i2i = parse(f)
-        res[0].extend(o2o)
-        res[1].extend(o2i)
-        res[2].extend(i2o)
-        res[3].extend(i2i)
+        res['o2o'].extend(o2o)
+        res['o2i'].extend(o2i)
+        res['i2o'].extend(i2o)
+        res['i2i'].extend(i2i)
+    res['o2o'] = np.random.choice(res['o2o'], min(100000, len(res['o2o'])), replace=False)
+    res['o2i'] = np.random.choice(res['o2i'], min(100000, len(res['o2i'])), replace=False)
+    res['i2o'] = np.random.choice(res['i2o'], min(100000, len(res['i2o'])), replace=False)
+    res['i2i'] = np.random.choice(res['i2i'], min(100000, len(res['i2i'])), replace=False)
+    logger.info("{} {} {} {}".format(res['o2o'].shape,res['o2i'].shape,res['i2o'].shape,res['i2i'].shape))
     np.save(join(outputdir, 'ipt.npy'), res)
-    logger.info("Extract o2o {}, o2i {}, i2o {}, i2i {}.".format(len(o2o), len(o2i), len(i2o), len(i2i)))
     # logger.info("KDE modeling...")
     # cdf = []
     # for data in res:
