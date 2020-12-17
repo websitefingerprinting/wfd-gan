@@ -38,9 +38,9 @@ def parse(fpath):
         lastpkt = t[i-1]
         ipt = curpkt[0] - lastpkt[0]
         assert ipt >= 0
-        if ipt <= 1e-6:
-            ipt = 1e-6
-        elif ipt > 1:
+        # if ipt <= 1e-6:
+        #     ipt = 1e-6
+        if ipt > 1:
             ipt = 1
         if curpkt[1] > 0 and lastpkt[1] > 0:
             o2o.append( ipt )
@@ -98,12 +98,12 @@ if __name__ == '__main__':
         res[i] = np.log10(res[i])
     np.save(join(outputdir, 'ipt.npy'), res)
     logger.info("Extract o2o {}, o2i {}, i2o {}, i2i {}.".format(len(o2o), len(o2i), len(i2o), len(i2i)))
-    logger.info("KDE modeling...")
-    cdf = []
-    for data in res:
-        x, y = FFTKDE(kernel='gaussian', bw='silverman').fit(data).evaluate()
-        cumsum_y = np.cumsum(y)/sum(y)
-        cdf.append([x, cumsum_y])
-    np.save(join(outputdir, 'cdf.npy'), cdf)
+    # logger.info("KDE modeling...")
+    # cdf = []
+    # for data in res:
+    #     x, y = FFTKDE(kernel='gaussian', bw='silverman').fit(data).evaluate()
+    #     cumsum_y = np.cumsum(y)/sum(y)
+    #     cdf.append([x, cumsum_y])
+    # np.save(join(outputdir, 'cdf.npy'), cdf)
 
 
