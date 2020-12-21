@@ -45,10 +45,6 @@ def weibull(k=0.75):
     return np.random.weibull(0.75)
 
 
-def uniform():
-    return np.random.uniform(1, 10)
-
-
 def dump(trace, fpath):
     '''Write trace packet into file `fpath`.'''
     with open(fpath, 'w') as fo:
@@ -151,10 +147,13 @@ def MergePad2(output_dir, outputname, noise, mergelist=None, waiting_time=10):
             cls_num = 1
             logger.debug("Sampled trace class: {}".format(cls_num))
             if cnt == len(mergelist) - 1:
-                ###This is a param in mergepadding###
-                t = np.random.uniform(waiting_time, waiting_time + 5)
+                ### This is a param in mergepadding###
+                '''We assume that the dwell time on the last page d_{max} = uniform(10,15),
+                For an attacker, the best he can do is remove the last 10s traffic.  
+                '''
+                t = np.random.uniform(waiting_time, waiting_time + 5) - waiting_time
             else:
-                t = uniform()
+                t = np.random.uniform(1, 10)
             small_time = est_iat(trace)
             # logger.debug("Delta t is %.5f seconds. Dwell time %.4f" % (small_time, t))
             noise_site = syn_trace(cls_num, max(t - small_time, 0))
@@ -162,7 +161,7 @@ def MergePad2(output_dir, outputname, noise, mergelist=None, waiting_time=10):
             # logger.info("Dwell time is %.2f seconds"%(t))
             start = start + t
         else:
-            t = uniform()
+            t = np.random.uniform(1, 10)
             start = start + t
 
     if noise:
