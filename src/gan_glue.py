@@ -154,8 +154,9 @@ def MergePad2(output_dir, outputname, noise, mergelist=None, waiting_time=10):
             else:
                 t = np.random.uniform(1, 10)
             small_time = est_iat(trace)
+
             # logger.debug("Delta t is %.5f seconds. Dwell time %.4f" % (small_time, t))
-            noise_site = syn_trace(cls_num, max(t - small_time, 0))
+            noise_site = syn_trace(cls_num, max(t - small_time, 0.01))
             this = merge(this, noise_site, start + small_time, cnt=999)
             # logger.info("Dwell time is %.2f seconds"%(t))
             start = start + t
