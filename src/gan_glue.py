@@ -144,8 +144,7 @@ def MergePad2(output_dir, outputname, noise, mergelist=None, waiting_time=10):
         '''pad noise or not'''
         if noise:
             cls_num = np.random.randint(MON_SITE_NUM + OPEN_WORLD)
-            cls_num = 1
-            logger.debug("Sampled trace class: {}".format(cls_num))
+            # logger.debug("Sampled trace class: {}".format(cls_num))
             if cnt == len(mergelist) - 1:
                 ### This is a param in mergepadding###
                 '''We assume that the dwell time on the last page d_{max} = uniform(10,15),
@@ -167,7 +166,7 @@ def MergePad2(output_dir, outputname, noise, mergelist=None, waiting_time=10):
     if noise:
         this = this[this[:, 0].argsort(kind="mergesort")]
     dump(this, join(output_dir, outputname + '.merge'))
-    logger.debug("Merged trace is dumpped to %s.merge" % outputname)
+    # logger.debug("Merged trace is dumpped to %s.merge" % outputname)
     return labels
 
 
