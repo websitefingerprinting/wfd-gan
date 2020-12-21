@@ -11,7 +11,7 @@ for m in range(2,17):
     cmd = "python3 " + src_path + " --dir /home/homes/jgongac/websiteFingerprinting/data/evaluation/ " + \
           "--model dump/evaluation/model_/ --ipt dump/evaluation/kde/cdf.npy " + \
           "-n "+ str(n)+" -m "+str(m)+ " -b 10 --noise True --mode fix"
-    print(cmd)
-    # subprocess.call(cmd, shell = True)
+    # print(cmd)
+    subprocess.call(cmd, shell = True)
 
 
