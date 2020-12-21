@@ -6,3 +6,6 @@ LOG_FORMAT = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
 
 # Loss weight for gradient penalty
 lambda_gp = 10
+
+# for gan-glue
+TRACE_SEP ='\t'
