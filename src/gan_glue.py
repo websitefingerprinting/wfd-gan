@@ -315,7 +315,7 @@ class IPT_Sampler:
 
     def sample_(self, cdf_index):
         x, cdf = self.cdfs[cdf_index]
-        y = np.random.uniform(0, 1)
+        y = np.random.uniform(0.0001, 1)  # use 0.0001 to avoid exception next line
         y0, y1 = cdf[cdf <= y][-1], cdf[cdf >= y][0]
         x0, x1 = x[cdf <= y][-1], x[cdf >= y][0]
         if y0 == y1:
