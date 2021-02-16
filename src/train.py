@@ -100,7 +100,7 @@ if __name__ == '__main__':
         w_dist_epoch = 0
         for i, (traces, c) in enumerate(dataloader):
             # Configure input
-            real_traces = Variable(traces.type(Tensor))
+            real_traces = Variable(traces.type(Tensor), requires_grad=True)
             c = Variable(Tensor(np.eye(class_dim)[c]))
 
             # ---------------------
