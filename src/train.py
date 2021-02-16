@@ -1,20 +1,25 @@
 import argparse
-import common as cm
-import utils
-from torch.utils.data import DataLoader
-from torch.autograd import Variable
-from model import *
-import torch.utils.data as Data
 import os
 from os.path import join
+
 from sklearn import preprocessing
 import joblib
-
+from torch.utils.data import DataLoader
+import torch.utils.data as Data
+from torch.autograd import Variable
+import torch.autograd as autograd
 from torchsummaryX import summary
+
+import common as cm
+from model import *
+import utils
+
 
 cuda = True if torch.cuda.is_available() else False
 device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 
+k = 2
+p = 6
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -112,11 +117,30 @@ if __name__ == '__main__':
             real_validity = discriminator(real_traces, c)
             # Fake traces
             fake_validity = discriminator(fake_traces, c)
-            # Gradient penalty
-            gradient_penalty = utils.compute_gradient_penalty(discriminator, real_traces.data, fake_traces.data, c,
-                                                              Tensor)
+
+            # Compute W-div gradient penalty
+            real_grad_out = Variable(Tensor(real_traces.size(0), 1).fill_(1.0), requires_grad=False)
+            real_grad = autograd.grad(
+                real_validity, real_traces, real_grad_out, create_graph=True, retain_graph=True, only_inputs=True
+            )[0]
+            real_grad_norm = real_grad.view(real_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
+
+            fake_grad_out = Variable(Tensor(fake_traces.size(0), 1).fill_(1.0), requires_grad=False)
+            fake_grad = autograd.grad(
+                fake_validity, fake_traces, fake_grad_out, create_graph=True, retain_graph=True, only_inputs=True
+            )[0]
+            fake_grad_norm = fake_grad.view(fake_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
+
+            div_gp = torch.mean(real_grad_norm + fake_grad_norm) * k / 2
+
             # Adversarial loss
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + cm.lambda_gp * gradient_penalty
+            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + div_gp
+
+            # # Gradient penalty
+            # gradient_penalty = utils.compute_gradient_penalty(discriminator, real_traces.data, fake_traces.data, c,
+            #                                                   Tensor)
+            # # Adversarial loss
+            # d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + cm.lambda_gp * gradient_penalty
 
             w_dist_epoch += (torch.mean(real_validity) - torch.mean(fake_validity)).item() / len(dataloader)
             discriminator_loss_epoch += d_loss.item() / len(dataloader)
@@ -151,7 +175,7 @@ if __name__ == '__main__':
             % (epoch + 1, args.n_epochs, discriminator_loss_epoch, generator_loss_epoch, w_dist_epoch)
         )
         if (epoch == 0) or (epoch + 1) % args.freq == 0:
-            # every 10 epoch, checkpoint
+            # every args.freq epoch, checkpoint
             total_real = np.array(total_real)
             total_fake = np.array(total_fake)
             total_c = np.array(total_c).argmax(axis=1)
