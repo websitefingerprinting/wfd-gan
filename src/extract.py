@@ -70,7 +70,7 @@ def extract(x):
             cnt = abs(e)
             sign = np.sign(e)
     new_x.append(cnt)
-    new_x.insert(0,len(new_x))
+    new_x.insert(0, len(new_x))
     new_x = new_x[:length] + [0] * (length - len(new_x))
     assert len(new_x) == length
     return new_x

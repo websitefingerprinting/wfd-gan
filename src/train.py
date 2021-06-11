@@ -2,6 +2,7 @@ import argparse
 import os
 from os.path import join
 
+import numpy as np
 from sklearn import preprocessing
 import joblib
 from torch.utils.data import DataLoader
@@ -14,12 +15,12 @@ import common as cm
 from model import *
 import utils
 
-
 cuda = True if torch.cuda.is_available() else False
 device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 
 k = 2
 p = 6
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     X = scaler.fit_transform(X)
     X = torch.from_numpy(X)
     y = torch.from_numpy(y)
-    class_dim = y.max() + 1 # index start from 0
+    class_dim = y.max() + 1  # index start from 0
     seq_len = X.size(1)
     assert seq_len > 1
     assert class_dim > 1
@@ -181,18 +182,21 @@ if __name__ == '__main__':
             total_c = np.array(total_c).argmax(axis=1)
             total_real = scaler.inverse_transform(total_real)
             total_fake = scaler.inverse_transform(total_fake)
-            logger.info("Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()),
+            logger.debug("Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()),
                                                                              int(total_fake.max())))
-            np.save(join(checkpointdir, "epoch_{}.npy".format(epoch + 1)),
-                    {'x': total_real, 'recon_x': total_fake, 'label': total_c})
+            np.savez_compressed(join(checkpointdir, "epoch_{}.npy".format(epoch + 1)),
+                                x=total_real, recon_x=total_fake, label=total_c)
         loss_checkpoints['generator'].append(generator_loss_epoch)
         loss_checkpoints['discriminator'].append(discriminator_loss_epoch)
         loss_checkpoints['dist'].append(w_dist_epoch)
-    np.save(join(checkpointdir, "loss.npy".format(loss_checkpoints)), loss_checkpoints)
-    torch.save(generator.state_dict(), join(modeldir, 'generator_seqlen{}_cls{}_latentdim{}.ckpt'.format(seq_len, class_dim, args.latent_dim)))
+    np.savez_compressed(join(checkpointdir, "loss.npz".format(loss_checkpoints)),
+                        generator=loss_checkpoints['generator'], discriminator=loss_checkpoints['discriminator'],
+                        dist=loss_checkpoints['dist'])
+    torch.save(generator.state_dict(),
+               join(modeldir, 'generator_seqlen{}_cls{}_latentdim{}.ckpt'.format(seq_len, class_dim, args.latent_dim)))
     torch.save(discriminator.state_dict(), join(modeldir, 'discriminator.ckpt'))
     logger.info("Model saved at {}".format(modeldir))
-    joblib.dump(scaler, join(modeldir,'scaler.gz'))
+    joblib.dump(scaler, join(modeldir, 'scaler.gz'))
     logger.info("Scaler saved at {}".format(modeldir))
     # generator.eval()
     # with torch.no_grad():
