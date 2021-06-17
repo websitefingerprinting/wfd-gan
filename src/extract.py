@@ -76,7 +76,7 @@ def extract(x):
     return new_x
 
 
-def parallel(flist, n_jobs=20):
+def parallel(flist, n_jobs=60):
     with mp.Pool(n_jobs) as p:
         res = p.map(extractfeature, flist)
         p.close()
