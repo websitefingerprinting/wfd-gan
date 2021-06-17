@@ -128,7 +128,7 @@ if __name__ == '__main__':
         if os.path.exists(os.path.join(args.dir, str(i) + args.format)):
             flist.append(os.path.join(args.dir, str(i) + args.format))
 
-    raw_data_dict = parallel(flist, n_jobs=20)
+    raw_data_dict = parallel(flist)
     features, labels = zip(*raw_data_dict)
     features = np.array(features)
     labels = np.array(labels)
