@@ -10,6 +10,7 @@ from KDEpy import FFTKDE
 logger = utils.init_logger('ipt')
 bandwidth = 0.01
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Generat a distribution for ipt')
 
@@ -33,9 +34,9 @@ def parse(fpath):
     t = pd.Series(tmp).str.slice(0, -1).str.split("\t", expand=True).astype(float)
     t = np.array(t)
     o2o, o2i, i2o, i2i = [], [], [], []
-    for i in range(1,len(t)):
+    for i in range(1, len(t)):
         curpkt = t[i]
-        lastpkt = t[i-1]
+        lastpkt = t[i - 1]
         ipt = curpkt[0] - lastpkt[0]
         assert ipt >= 0
         if ipt <= 1e-6:
@@ -43,17 +44,14 @@ def parse(fpath):
         if ipt > 1:
             ipt = 1
         if curpkt[1] > 0 and lastpkt[1] > 0:
-            o2o.append( ipt )
-        elif curpkt[1] >0 and lastpkt[1] < 0:
-            i2o.append( ipt )
+            o2o.append(ipt)
+        elif curpkt[1] > 0 and lastpkt[1] < 0:
+            i2o.append(ipt)
         elif curpkt[1] < 0 and lastpkt[1] > 0:
-            o2i.append( ipt )
+            o2i.append(ipt)
         elif curpkt[1] < 0 and lastpkt[1] < 0:
-            i2i.append( ipt )
+            i2i.append(ipt)
     return o2o, o2i, i2o, i2i
-
-
-
 
 
 if __name__ == '__main__':
@@ -64,7 +62,6 @@ if __name__ == '__main__':
     if not os.path.exists(outputdir):
         os.makedirs(outputdir)
     logger.info("Arguments: %s" % (args))
-
 
     cf = utils.read_conf(cm.confdir)
     MON_SITE_NUM = int(cf['monitored_site_num'])
@@ -85,10 +82,10 @@ if __name__ == '__main__':
         if os.path.exists(os.path.join(args.dir, str(i) + args.format)):
             flist.append(os.path.join(args.dir, str(i) + args.format))
 
-    res = {'o2o':[],'o2i':[],'i2o':[],'i2i':[]}
+    res = {'o2o': [], 'o2i': [], 'i2o': [], 'i2i': []}
     for i, f in enumerate(flist[:]):
         if i % 1000 == 0:
-            logger.info("Processing {}/{}".format(i,len(flist)))
+            logger.info("Processing {}/{}".format(i, len(flist)))
         o2o, o2i, i2o, i2i = parse(f)
         res['o2o'].extend(o2o)
         res['o2i'].extend(o2i)
@@ -100,14 +97,12 @@ if __name__ == '__main__':
     # res['o2i'] = np.random.choice(res['o2i'], min(100000000, len(res['o2i'])), replace=False)
     # res['i2o'] = np.random.choice(res['i2o'], min(100000000, len(res['i2o'])), replace=False)
     # res['i2i'] = np.random.choice(res['i2i'], min(100000000, len(res['i2i'])), replace=False)
-    logger.info("{} {} {} {}".format(res['o2o'].shape,res['o2i'].shape,res['i2o'].shape,res['i2i'].shape))
+    logger.info("{} {} {} {}".format(res['o2o'].shape, res['o2i'].shape, res['i2o'].shape, res['i2i'].shape))
     np.save(join(outputdir, 'ipt.npy'), res)
     logger.info("KDE modeling...")
     cdf = {}
     for kind in res.keys():
         x, y = FFTKDE(kernel='gaussian', bw='silverman').fit(res[kind]).evaluate()
-        cumsum_y = np.cumsum(y)/sum(y)
+        cumsum_y = np.cumsum(y) / sum(y)
         cdf[kind] = [x, cumsum_y]
     np.save(join(outputdir, 'cdf.npy'), cdf)
-
-
