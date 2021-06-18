@@ -68,7 +68,7 @@ def parse(fpath):
 
 
 def prepare_dataset(flist):
-    with multiprocessing.Pool(2) as p:
+    with multiprocessing.Pool(50) as p:
         res = p.map(parse, flist)
     o2o_list = []
     o2i_list = []
