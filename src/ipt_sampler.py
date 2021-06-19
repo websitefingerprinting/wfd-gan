@@ -30,6 +30,7 @@ def parse_arguments():
                         )
     parser.add_argument('-n',
                         metavar='<resampling number>',
+                        type=int,
                         default=100000,
                         help='The number of data points resampled from the original distribution'
                         )
@@ -53,7 +54,7 @@ def parse(fpath):
     filtered_trace = np.array(filtered_trace)
     outgoing_filtered_trace = filtered_trace[filtered_trace[:, 1] > 0]
     o2o = np.diff(outgoing_filtered_trace[:, 0])
-    assert (o2o >= 0).all()
+
     o2i = []
     for i in range(1, len(filtered_trace)):
         cur_time, cur_size = filtered_trace[i]
@@ -63,12 +64,16 @@ def parse(fpath):
         last_time = filtered_trace[i - 1][0]
         o2i.append(cur_time - last_time)
     o2i = np.array(o2i)
-    assert (o2i >= 0).all()
+    try:
+        assert (o2o >= 0).all()
+        assert (o2i >= 0).all()
+    except Exception as e:
+        logger.error(fpath)
     return list(o2o), list(o2i)
 
 
 def prepare_dataset(flist):
-    with multiprocessing.Pool(50) as p:
+    with multiprocessing.Pool(80) as p:
         res = p.map(parse, flist)
     o2o_list = []
     o2i_list = []
@@ -118,7 +123,7 @@ if __name__ == '__main__':
     pdf = {}
     for key in ipt_dataset.keys():
         data = ipt_dataset[key]
-        data[data == 0] = 1e-9
+        data[data == 0] = 1e-6
         log_ipt = np.log10(data)
         x, y = FFTKDE(kernel='gaussian', bw='ISJ').fit(log_ipt).evaluate()
         pdf[key] = [x, y]
@@ -128,7 +133,7 @@ if __name__ == '__main__':
     logger.info("Resampling data")
     for key in ipt_dataset.keys():
         data = ipt_dataset[key]
-        data[data == 0] = 1e-9
+        data[data == 0] = 1e-6
         log_ipt = np.log10(data)
         kernel_std = improved_sheather_jones(log_ipt.reshape(-1, 1))  # Shape (obs, dims)
         # (1) First resample original data, then (2) add noise from kernel
