@@ -58,7 +58,7 @@ if __name__ == '__main__':
     modeldir, checkpointdir = init_directory(args.dir)
 
     # Configure data loader
-    X, y = utils.loadDataset(args.dir)
+    X, y = utils.load_dataset(args.dir)
     logger.info("Loaded dataset:{}, min burst:{} max burst:{}".format(X.shape, X.min(), X.max()))
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)

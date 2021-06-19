@@ -7,8 +7,9 @@ import logging
 import configparser
 import common as cm
 
-
 '''For common usage'''
+
+
 def init_logger(name):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
@@ -30,6 +31,8 @@ def read_conf(file):
 
 
 '''For GAN'''
+
+
 def compute_gradient_penalty(D, real_samples, fake_samples, c, Tensor):
     """Calculates the gradient penalty loss for WGAN GP"""
     # Random weight term for interpolation between real and fake samples
@@ -53,6 +56,7 @@ def compute_gradient_penalty(D, real_samples, fake_samples, c, Tensor):
     return gradient_penalty
 
 
+# deprecated function
 def loadDataset(dir):
     '''Load Dataset from npy file, normalize it and change it to tensor'''
     '''x: (num x length)
@@ -61,8 +65,18 @@ def loadDataset(dir):
     X, y = data['feature'], data['label']
     return X, y
 
+
+def load_dataset(dir):
+    """Load Dataset from npz file"""
+    '''x: (num x length)
+       y: (num, )'''
+    data = np.load(dir)
+    X, y = data['features'], data['labels']
+    return X, y
+
+
 def loadTrace(fdir):
-    with open(fdir,'r') as f:
+    with open(fdir, 'r') as f:
         tmp = f.readlines()
-    trace = np.array(pd.Series(tmp).str.slice(0,-1).str.split("\t",expand=True).astype(float))
+    trace = np.array(pd.Series(tmp).str.slice(0, -1).str.split("\t", expand=True).astype(float))
     return trace

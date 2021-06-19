@@ -117,7 +117,6 @@ if __name__ == '__main__':
         UNMON_SITE_NUM = 0
 
     # logger.info('Extracting features...')
-    data_dict = {'feature': [], 'label': []}
 
     flist = []
     for i in range(MON_SITE_NUM):
@@ -132,10 +131,9 @@ if __name__ == '__main__':
     features, labels = zip(*raw_data_dict)
     features = np.array(features)
     labels = np.array(labels)
-    data_dict['feature'], data_dict['label'] = features, labels
     logger.info("feature sizes:{}, label size:{}".format(features.shape, labels.shape))
-    np.save(join(outputdir, "raw_feature"), data_dict)
-    logger.info("output to {}".format(outputdir))
+    np.savez_compressed(join(outputdir, "raw_feature.npz"), features=features, labels=labels)
+    logger.info("output to {}".format(join(outputdir, "raw_feature.npz")))
     if args.save_txt:
         with open(join(outputdir, 'raw_feature.txt'), 'w') as f:
             for feature in features:
