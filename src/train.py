@@ -53,12 +53,14 @@ def init_directory(dir, tag=""):
 if __name__ == '__main__':
     # argumments
     args, logger = parse_args()
+    cf = utils.read_conf(cm.confdir)
 
     # create folder
     modeldir, checkpointdir = init_directory(args.dir)
 
     # Configure data loader
     X, y = utils.load_dataset(args.dir)
+    X, y = utils.prepare_dataset(X, y, cf)
     logger.info("Loaded dataset:{}, min burst:{} max burst:{}".format(X.shape, X.min(), X.max()))
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)

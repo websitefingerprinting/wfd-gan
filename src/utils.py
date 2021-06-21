@@ -75,6 +75,25 @@ def load_dataset(dir):
     return X, y
 
 
+def prepare_dataset(features, labels, config):
+    """Pick data from a specific config
+    Pick 0 ~ MON_SITE_NUM-1 classes, each one pick MON_INST_NUM instances,
+    index starting from MONITORED_START_IND
+    """
+    MON_SITE_NUM = int(config['monitored_site_num'])
+    MON_INST_NUM = int(config['monitored_inst_num'])
+    MONITORED_START_IND = int(config['monitored_start_ind'])
+    assert (MON_SITE_NUM > 0 and MON_INST_NUM > 0 and MONITORED_START_IND >= 0)
+    X, y = [], []
+    for mon_site_ind in range(MON_SITE_NUM):
+        tmp = labels[labels == mon_site_ind]
+        labels_class = list(labels[labels == mon_site_ind][MONITORED_START_IND:MONITORED_START_IND + MON_INST_NUM])
+        features_class = list(features[labels == mon_site_ind][MONITORED_START_IND:MONITORED_START_IND + MON_INST_NUM])
+        X.extend(features_class)
+        y.extend(labels_class)
+    return np.array(X), np.array(y)
+
+
 def loadTrace(fdir):
     with open(fdir, 'r') as f:
         tmp = f.readlines()
