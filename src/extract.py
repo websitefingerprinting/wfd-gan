@@ -8,10 +8,10 @@ import multiprocessing as mp
 import pandas as pd
 
 logger = utils.init_logger('extract')
-
+burst_reorder_threshold_t = 0.002
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Extract burst sequences from raw traces')
+    parser = argparse.ArgumentParser(description='Extract burst sequences ipt from raw traces')
 
     parser.add_argument('--dir',
                         metavar='<traces path>',
@@ -24,12 +24,7 @@ def parse_arguments():
                         )
     parser.add_argument('--format',
                         metavar='<file suffix>',
-                        default=".burst",
-                        )
-    parser.add_argument('--save_txt',
-                        action='store_true',
-                        default=False,
-                        help='Whether output to txt file.'
+                        default=".pkt",
                         )
     parser.add_argument('--log',
                         type=str,
@@ -43,40 +38,76 @@ def parse_arguments():
     return args
 
 
-def parse(fpath):
-    with open(fpath, "r") as f:
-        tmp = f.readlines()
-    t = pd.Series(tmp).str.slice(0, -1).str.split("\t", expand=True).astype(float)
-    t = np.array(t)
-    return t[:, 1]
 
-
-def extract(x):
-    global length
-    start = -1
-    for pkt in x:
-        start += 1
-        if pkt > 0:
-            break
-    x = x[start:]
-    new_x = []
-    sign = np.sign(x[0])
-    cnt = 0
-    for e in x:
-        if np.sign(e) == sign:
-            cnt += abs(e)
+def group_pkts(pkts):
+    """Group packets into bursts, if time gap between two packets are less than threshold,
+    then group together. The timestamp for a burst is the timestamp of the start packet.
+    """
+    burst_seq = []
+    cnt = pkts[0, 1]
+    start_time = pkts[0, 0]
+    for i in range(1, len(pkts)):
+        last_pkt = pkts[i-1]
+        cur_pkt = pkts[i]
+        if cur_pkt[0] - last_pkt[0] < burst_reorder_threshold_t:
+            cnt += cur_pkt[1]
         else:
-            new_x.append(cnt)
-            cnt = abs(e)
-            sign = np.sign(e)
-    new_x.append(cnt)
-    new_x.insert(0, len(new_x))
-    new_x = new_x[:length] + [0] * (length - len(new_x))
-    assert len(new_x) == length
-    return new_x
+            burst_seq.append([start_time, cnt])
+            cnt = cur_pkt[1]
+            start_time = cur_pkt[0]
+    burst_seq.append([start_time, cnt])
+    burst_seq = np.array(burst_seq)
+
+    assert sum(burst_seq[:, 1]) == sum(pkts[:, 1])
+    return burst_seq
 
 
-def parallel(flist, n_jobs=60):
+def get_burst(trace):
+    # first remove the first few lines that are incoming packets
+    start = -1
+    for time, size in trace:
+        start += 1
+        if size > 0:
+            break
+    trace = trace[start:].copy()
+    outgoing_burst_seqs = group_pkts(trace[trace[:, 1] > 0])
+    incoming_burst_seqs = group_pkts(trace[trace[:, 1] < 0])
+    burst_seqs = np.concatenate((outgoing_burst_seqs, incoming_burst_seqs), axis=0)
+    assert len(burst_seqs) == len(outgoing_burst_seqs) + len(incoming_burst_seqs)
+    burst_seqs = burst_seqs[burst_seqs[:, 0].argsort()]
+
+    # merge bursts from the same direction
+    merged_burst_seqs = []
+    cnt = 0
+    sign = np.sign(burst_seqs[0, 1])
+    time = burst_seqs[0, 0]
+    for cur_time, cur_size in burst_seqs:
+        if np.sign(cur_size) == sign:
+            cnt += cur_size
+        else:
+            merged_burst_seqs.append([time, cnt])
+            sign = np.sign(cur_size)
+            cnt = cur_size
+            time = cur_time
+    merged_burst_seqs.append([time, cnt])
+    merged_burst_seqs = np.array(merged_burst_seqs)
+    assert sum(merged_burst_seqs[::2, 1]) == sum(trace[trace[:, 1] > 0][:, 1])
+    assert sum(merged_burst_seqs[1::2, 1]) == sum(trace[trace[:, 1] < 0][:, 1])
+    return np.array(merged_burst_seqs)
+
+
+def extract(trace):
+    global length
+    burst_seq = get_burst(trace)
+    times = burst_seq[:, 0]
+    bursts = list(abs(burst_seq[:, 1]))
+    bursts.insert(0, len(bursts))
+    bursts = bursts[:length] + [0] * (length - len(bursts))
+    assert len(bursts) == length
+    return bursts, times
+
+
+def parallel(flist, n_jobs=2):
     with mp.Pool(n_jobs) as p:
         res = p.map(extractfeature, flist)
         p.close()
@@ -84,16 +115,16 @@ def parallel(flist, n_jobs=60):
     return res
 
 
-def extractfeature(f):
+def extractfeature(fdir):
     global MON_SITE_NUM
-    fname = f.split('/')[-1].split(".")[0]
-    t = parse(f)
-    features = extract(t)
+    fname = fdir.split('/')[-1].split(".")[0]
+    trace = utils.loadTrace(fdir)
+    bursts, times = extract(trace)
     if '-' in fname:
         label = int(fname.split('-')[0])
     else:
         label = int(MON_SITE_NUM)
-    return features, label
+    return bursts, times, label
 
 
 if __name__ == '__main__':
@@ -128,17 +159,12 @@ if __name__ == '__main__':
             flist.append(os.path.join(args.dir, str(i) + args.format))
 
     raw_data_dict = parallel(flist)
-    features, labels = zip(*raw_data_dict)
-    features = np.array(features)
+    bursts, times, labels = zip(*raw_data_dict)
+    bursts = np.array(bursts)
     labels = np.array(labels)
-    logger.info("feature sizes:{}, label size:{}".format(features.shape, labels.shape))
-    np.savez_compressed(join(outputdir, "raw_feature.npz"), features=features, labels=labels)
+    logger.info("feature sizes:{}, label size:{}".format(bursts.shape, labels.shape))
+    np.savez_compressed(join(outputdir, "raw_feature.npz"), features=bursts, labels=labels)
     logger.info("output to {}".format(join(outputdir, "raw_feature.npz")))
-    if args.save_txt:
-        with open(join(outputdir, 'raw_feature.txt'), 'w') as f:
-            for feature in features:
-                # feature = feature.argmax(axis=1)
-                end = np.where(np.array(feature) > 0)[0][-1]  # last one
-                for pkt in feature[:end]:
-                    f.write("{:.0f} ".format(pkt))
-                f.write("{:.0f}\n".format(feature[end]))
+
+    # save the time information. The even indexes are outgoing timestamps and the odd indexes are incoming ones. 
+    np.savez(join(outputdir, "time_feature.npz"), *times)
