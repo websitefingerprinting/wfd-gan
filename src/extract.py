@@ -107,7 +107,7 @@ def extract(trace):
     return bursts, times
 
 
-def parallel(flist, n_jobs=2):
+def parallel(flist, n_jobs=80):
     with mp.Pool(n_jobs) as p:
         res = p.map(extractfeature, flist)
         p.close()
@@ -166,5 +166,5 @@ if __name__ == '__main__':
     np.savez_compressed(join(outputdir, "raw_feature.npz"), features=bursts, labels=labels)
     logger.info("output to {}".format(join(outputdir, "raw_feature.npz")))
 
-    # save the time information. The even indexes are outgoing timestamps and the odd indexes are incoming ones. 
+    # save the time information. The even indexes are outgoing timestamps and the odd indexes are incoming ones.
     np.savez(join(outputdir, "time_feature.npz"), *times)
