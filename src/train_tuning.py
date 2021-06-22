@@ -48,7 +48,7 @@ def init_directory(dir, tag=""):
         os.makedirs(modeldir)
     if not os.path.exists(checkpointdir):
         os.makedirs(checkpointdir)
-    return modeldir, checkpointdir
+    return join(basedir, tag), modeldir, checkpointdir
 
 
 if __name__ == '__main__':
@@ -57,7 +57,14 @@ if __name__ == '__main__':
     cf = utils.read_conf(cm.confdir)
 
     # create folder
-    modeldir, checkpointdir = init_directory(args.dir, tag='tuning_{}'.format(strftime('%m%d_%H%M%S')))
+    pardir, modeldir, checkpointdir = init_directory(args.dir, tag='tuning_{}'.format(strftime('%m%d_%H%M%S')))
+
+    # record the arguments
+    with open(join(pardir, 'params.txt'), 'w') as f:
+        f.write('n_epochs={}\n'.format(args.n_epochs))
+        f.write('batch_size={}\n'.format(args.batch_size))
+        f.write('lr={}\n'.format(args.lr))
+        f.write('latent_dim={}\n'.format(args.latent_dim))
 
     # Configure data loader
     X, y = utils.load_dataset(args.dir)
@@ -187,7 +194,7 @@ if __name__ == '__main__':
             total_fake = scaler.inverse_transform(total_fake)
             logger.debug("Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()),
                                                                              int(total_fake.max())))
-            np.savez_compressed(join(checkpointdir, "epoch_{}.npy".format(epoch + 1)),
+            np.savez_compressed(join(checkpointdir, "epoch_{}".format(epoch + 1)),
                                 x=total_real, recon_x=total_fake, label=total_c)
         loss_checkpoints['generator'].append(generator_loss_epoch)
         loss_checkpoints['discriminator'].append(discriminator_loss_epoch)

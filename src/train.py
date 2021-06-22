@@ -186,7 +186,7 @@ if __name__ == '__main__':
             total_fake = scaler.inverse_transform(total_fake)
             logger.debug("Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()),
                                                                              int(total_fake.max())))
-            np.savez_compressed(join(checkpointdir, "epoch_{}.npy".format(epoch + 1)),
+            np.savez_compressed(join(checkpointdir, "epoch_{}".format(epoch + 1)),
                                 x=total_real, recon_x=total_fake, label=total_c)
         loss_checkpoints['generator'].append(generator_loss_epoch)
         loss_checkpoints['discriminator'].append(discriminator_loss_epoch)

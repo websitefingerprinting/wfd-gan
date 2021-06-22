@@ -11,7 +11,7 @@ logger = utils.init_logger('extract')
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Extract feature from raw traces')
+    parser = argparse.ArgumentParser(description='Extract burst sequences from raw traces')
 
     parser.add_argument('--dir',
                         metavar='<traces path>',
