@@ -8,7 +8,7 @@ import multiprocessing as mp
 import pandas as pd
 
 logger = utils.init_logger('extract')
-burst_reorder_threshold_t = 0.002
+burst_reorder_threshold_t = [0.008, 0.001]
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Extract burst sequences ipt from raw traces')
@@ -46,10 +46,14 @@ def group_pkts(pkts):
     burst_seq = []
     cnt = pkts[0, 1]
     start_time = pkts[0, 0]
+    if cnt > 0:
+        threshold = burst_reorder_threshold_t[0]
+    else:
+        threshold = burst_reorder_threshold_t[1]
     for i in range(1, len(pkts)):
         last_pkt = pkts[i-1]
         cur_pkt = pkts[i]
-        if cur_pkt[0] - last_pkt[0] < burst_reorder_threshold_t:
+        if cur_pkt[0] - last_pkt[0] < threshold:
             cnt += cur_pkt[1]
         else:
             burst_seq.append([start_time, cnt])
