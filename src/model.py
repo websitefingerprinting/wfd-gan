@@ -17,14 +17,15 @@ class Generator(nn.Module):
             layers = [nn.Linear(in_feat, out_feat)]
             if normalize:
                 layers.append(nn.BatchNorm1d(out_feat, 0.8))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            layers.append(nn.ReLU(inplace=True))
             return layers
 
         self.model = nn.Sequential(
-            *block(self.latent_dim + self.class_dim, 128, normalize=False),
-            *block(128, 256),
-            *block(256, 512),
-            nn.Linear(512, self.seq_size),
+            *block(self.latent_dim + self.class_dim, 512, normalize=False),
+            # *block(256, 512),
+            *block(512, 1024),
+            *block(1024, 2048),
+            nn.Linear(2048, self.seq_size),
             nn.Sigmoid()
         )
 
@@ -40,11 +41,16 @@ class Discriminator(nn.Module):
         self.seq_size = seq_size
         self.class_dim = class_dim
         self.model = nn.Sequential(
-            nn.Linear(self.seq_size + self.class_dim, 512),
+            nn.Linear(self.seq_size + self.class_dim, 2048),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 256),
+            nn.Dropout(0.2),
+            nn.Linear(2048, 1024),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(256, 1),
+            nn.Dropout(0.2),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.2),
+            nn.Linear(512, 1)
         )
 
     def forward(self, trace, c):
