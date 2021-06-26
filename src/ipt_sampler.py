@@ -1,5 +1,3 @@
-import multiprocessing
-
 import numpy as np
 import os
 from os.path import join
@@ -9,9 +7,13 @@ import argparse
 import pandas as pd
 from KDEpy import FFTKDE
 from KDEpy.bw_selection import silvermans_rule, improved_sheather_jones
+from functools import partial
+
 
 logger = utils.init_logger('ipt')
-INST_NUM = 100*1000
+INST_NUM = 100 * 1000
+core_num = 80
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Resample ipt from a dataset using FFTKDE modeling')
@@ -32,23 +34,34 @@ def parse_arguments():
     return args
 
 
+def parse_ipt(arr):
+    if len(arr) % 2 != 0:
+        arr = arr[:-1]
+    return list(np.diff(arr[::2])), list(arr[1::2] - arr[::2])
+
+
 def prepare_dataset(data):
     """input: arr_1, arr_2, ...
     For each array, an even position represents the timestamp of an outgoing burst,
     an odd position represents the timestamps of an incoming burst
     """
     cnt = -1
-    o2o = []
-    o2i = []
+    o2os = []
+    o2is = []
+    arr_list = []
+
+    cnt = -1
     for key in data.keys():
         cnt += 1
         if cnt >= INST_NUM:
             break
-        arr = data[key]
-        o2o.extend(list(np.diff(arr[::2])))
-        if len(arr) % 2 != 0:
-            arr = arr[:-1]
-        o2i.extend(list(arr[1::2] - arr[::2]))
+        arr_list.append(data[key])
+    with utils.poolcontext(processes=core_num) as p:
+        res = p.map(parse_ipt, arr_list)
+
+    for o2o, o2i in res:
+        o2os.extend(o2o)
+        o2is.extend(o2i)
     return np.array(o2o), np.array(o2i)
 
 

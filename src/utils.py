@@ -4,8 +4,11 @@ import torch.autograd as autograd
 import numpy as np
 import pandas as pd
 import logging
+from contextlib import contextmanager
 import configparser
 import common as cm
+import multiprocessing as mp
+
 
 '''For common usage'''
 
@@ -99,3 +102,10 @@ def loadTrace(fdir):
         tmp = f.readlines()
     trace = np.array(pd.Series(tmp).str.slice(0, -1).str.split("\t", expand=True).astype(float))
     return trace
+
+
+@contextmanager
+def poolcontext(*args, **kwargs):
+    pool = mp.Pool(*args, **kwargs)
+    yield pool
+    pool.terminate()
