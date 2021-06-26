@@ -17,7 +17,7 @@ from model import *
 import utils
 
 cuda = True if torch.cuda.is_available() else False
-device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
+# device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 
 k = 2
 p = 6
@@ -31,10 +31,11 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
     parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
     parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-    parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
+    parser.add_argument("--n_cpu", type=int, default=0, help="number of cpu threads to use during batch generation")
     parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
     parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
     parser.add_argument("--freq", type=int, default=20, help="Checkpoint every freq epochs")
+    parser.add_argument('--cuda_id', type=int, default=7, help='The id number of cuda to be used.')
     args = parser.parse_args()
     logger = utils.init_logger('gan')
     return args, logger
@@ -54,11 +55,14 @@ def init_directory(dir, tag=""):
 if __name__ == '__main__':
     # argumments
     args, logger = parse_args()
+    device = torch.device('cuda:{}'.format(args.cuda_id) if torch.cuda.is_available() else 'cpu')
+    logger.debug(device)
     cf = utils.read_conf(cm.confdir)
 
     # create folder
     pardir, modeldir, checkpointdir = init_directory(args.dir, tag='tuning_{}'.format(strftime('%m%d_%H%M%S')))
 
+    logger.info(pardir)
     # record the arguments
     with open(join(pardir, 'params.txt'), 'w') as f:
         f.write('n_epochs={}\n'.format(args.n_epochs))
@@ -90,9 +94,8 @@ if __name__ == '__main__':
     # Initialize generator and discriminator
     generator = Generator(seq_len, class_dim, args.latent_dim)
     discriminator = Discriminator(seq_len, class_dim)
-    if torch.cuda.is_available():
-        generator.cuda()
-        discriminator.cuda()
+    generator.to(device)
+    discriminator.to(device)
 
     # Optimizers
     optimizer_G = torch.optim.Adam(generator.parameters(), lr=args.lr, betas=(args.b1, args.b2))
@@ -111,8 +114,8 @@ if __name__ == '__main__':
         w_dist_epoch = 0
         for i, (traces, c) in enumerate(dataloader):
             # Configure input
-            real_traces = Variable(traces.type(Tensor), requires_grad=True)
-            c = Variable(Tensor(np.eye(class_dim)[c]))
+            real_traces = Variable(traces.type(Tensor), requires_grad=True).to(device)
+            c = Variable(Tensor(np.eye(class_dim)[c])).to(device)
 
             # ---------------------
             #  Train Discriminator
@@ -121,7 +124,7 @@ if __name__ == '__main__':
             optimizer_D.zero_grad()
 
             # Sample noise as generator input
-            z = Variable(Tensor(np.random.normal(0, 1, (traces.shape[0], args.latent_dim))))
+            z = Variable(Tensor(np.random.normal(0, 1, (traces.shape[0], args.latent_dim)))).to(device)
             # Generate a batch of traces
             fake_traces = generator(z, c)
             # Real traces
@@ -130,13 +133,13 @@ if __name__ == '__main__':
             fake_validity = discriminator(fake_traces, c)
 
             # Compute W-div gradient penalty
-            real_grad_out = Variable(Tensor(real_traces.size(0), 1).fill_(1.0), requires_grad=False)
+            real_grad_out = Variable(Tensor(real_traces.size(0), 1).fill_(1.0), requires_grad=False).to(device)
             real_grad = autograd.grad(
                 real_validity, real_traces, real_grad_out, create_graph=True, retain_graph=True, only_inputs=True
             )[0]
             real_grad_norm = real_grad.view(real_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
 
-            fake_grad_out = Variable(Tensor(fake_traces.size(0), 1).fill_(1.0), requires_grad=False)
+            fake_grad_out = Variable(Tensor(fake_traces.size(0), 1).fill_(1.0), requires_grad=False).to(device)
             fake_grad = autograd.grad(
                 fake_validity, fake_traces, fake_grad_out, create_graph=True, retain_graph=True, only_inputs=True
             )[0]
