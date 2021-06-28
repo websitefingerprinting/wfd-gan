@@ -1,6 +1,7 @@
 import argparse
 import os
 from os.path import join
+from time import strftime
 
 import numpy as np
 import torch.optim
@@ -40,13 +41,13 @@ def parse_args():
 
 def init_directory(dir, tag=""):
     basedir = os.path.split(os.path.split(dir)[0])[0]
-    modeldir = join(basedir, 'model_' + tag)
-    checkpointdir = join(basedir, 'checkpoint_' + tag)
+    modeldir = join(basedir, tag, 'model')
+    checkpointdir = join(basedir, tag, 'checkpoint')
     if not os.path.exists(modeldir):
         os.makedirs(modeldir)
     if not os.path.exists(checkpointdir):
         os.makedirs(checkpointdir)
-    return modeldir, checkpointdir
+    return join(basedir, tag), modeldir, checkpointdir
 
 
 if __name__ == '__main__':
@@ -55,7 +56,7 @@ if __name__ == '__main__':
     cf = utils.read_conf(cm.confdir)
 
     # create folder
-    modeldir, checkpointdir = init_directory(args.dir)
+    pardir, modeldir, checkpointdir = init_directory(args.dir, tag='tuning_{}'.format(strftime('%m%d_%H%M%S')))
 
     # Configure data loader
     X, y = utils.load_dataset(args.dir)

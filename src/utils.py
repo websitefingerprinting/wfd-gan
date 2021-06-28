@@ -3,11 +3,17 @@ from torch.autograd import Variable
 import torch.autograd as autograd
 import numpy as np
 import pandas as pd
+import glob
 import logging
+import multiprocessing as mp
+from os.path import join
 from contextlib import contextmanager
 import configparser
+import joblib
+import re
+
+from model import *
 import common as cm
-import multiprocessing as mp
 
 
 '''For common usage'''
@@ -81,17 +87,17 @@ def load_dataset(dir):
 def prepare_dataset(features, labels, config):
     """Pick data from a specific config
     Pick 0 ~ MON_SITE_NUM-1 classes, each one pick MON_INST_NUM instances,
-    index starting from MONITORED_START_IND
+    index starting from MON_INST_START_IND
     """
     MON_SITE_NUM = int(config['monitored_site_num'])
     MON_INST_NUM = int(config['monitored_inst_num'])
-    MONITORED_START_IND = int(config['monitored_start_ind'])
-    assert (MON_SITE_NUM > 0 and MON_INST_NUM > 0 and MONITORED_START_IND >= 0)
+    MON_INST_START_IND = int(config['monitored_inst_start_ind'])
+    assert (MON_SITE_NUM > 0 and MON_INST_NUM > 0 and MON_INST_START_IND >= 0)
     X, y = [], []
     for mon_site_ind in range(MON_SITE_NUM):
         tmp = labels[labels == mon_site_ind]
-        labels_class = list(labels[labels == mon_site_ind][MONITORED_START_IND:MONITORED_START_IND + MON_INST_NUM])
-        features_class = list(features[labels == mon_site_ind][MONITORED_START_IND:MONITORED_START_IND + MON_INST_NUM])
+        labels_class = list(labels[labels == mon_site_ind][MON_INST_START_IND:MON_INST_START_IND + MON_INST_NUM])
+        features_class = list(features[labels == mon_site_ind][MON_INST_START_IND:MON_INST_START_IND + MON_INST_NUM])
         X.extend(features_class)
         y.extend(labels_class)
     return np.array(X), np.array(y)
