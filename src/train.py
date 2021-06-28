@@ -56,8 +56,8 @@ if __name__ == '__main__':
     cf = utils.read_conf(cm.confdir)
 
     # create folder
-    pardir, modeldir, checkpointdir = init_directory(args.dir, tag='tuning_{}'.format(strftime('%m%d_%H%M%S')))
-
+    pardir, modeldir, checkpointdir = init_directory(args.dir, tag='training_{}'.format(strftime('%m%d_%H%M%S')))
+    logger.debug("Output to {}".format(pardir))
     # Configure data loader
     X, y = utils.load_dataset(args.dir)
     X, y = utils.prepare_dataset(X, y, cf)
