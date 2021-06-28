@@ -3,6 +3,7 @@ import os
 from os.path import join
 
 import numpy as np
+import torch.optim
 from sklearn import preprocessing
 import joblib
 from torch.utils.data import DataLoader
@@ -25,13 +26,11 @@ p = 6
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dir", required=True, help="Dataset directory.")
-    parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
-    parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
-    parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
-    parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
-    parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
+    parser.add_argument("--n_epochs", type=int, default=300, help="number of epochs of training")
+    parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
+    parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
     parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
-    parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
+    parser.add_argument("--latent_dim", type=int, default=50, help="dimensionality of the latent space")
     parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
     parser.add_argument("--freq", type=int, default=20, help="Checkpoint every freq epochs")
     args = parser.parse_args()
@@ -87,8 +86,8 @@ if __name__ == '__main__':
         discriminator.cuda()
 
     # Optimizers
-    optimizer_G = torch.optim.Adam(generator.parameters(), lr=args.lr, betas=(args.b1, args.b2))
-    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=args.lr, betas=(args.b1, args.b2))
+    optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=args.lr)
+    optimizer_D = torch.optim.RMSprop(discriminator.parameters(), lr=args.lr)
 
     Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
     LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor

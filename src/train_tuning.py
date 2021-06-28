@@ -3,6 +3,7 @@ import os
 from os.path import join
 
 import numpy as np
+import torch.optim
 from sklearn import preprocessing
 import joblib
 from torch.utils.data import DataLoader
@@ -98,8 +99,8 @@ if __name__ == '__main__':
     discriminator.to(device)
 
     # Optimizers
-    optimizer_G = torch.optim.Adam(generator.parameters(), lr=args.lr, betas=(args.b1, args.b2))
-    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=args.lr, betas=(args.b1, args.b2))
+    optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=args.lr)
+    optimizer_D = torch.optim.RMSprop(discriminator.parameters(), lr=args.lr)
 
     Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
     LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
