@@ -25,7 +25,7 @@ def parse_arguments():
     parser.add_argument('-n',
                         metavar='<resampling number>',
                         type=int,
-                        default=100000,
+                        default=1000000,
                         help='The number of data points resampled from the original distribution'
                         )
 

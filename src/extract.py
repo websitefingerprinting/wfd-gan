@@ -19,7 +19,7 @@ def parse_arguments():
                         help='Path to the directory with the traffic traces to be simulated.')
     parser.add_argument('--length',
                         type=int,
-                        default=1200,
+                        default=1000,
                         help='Pad to length.'
                         )
     parser.add_argument('--format',
