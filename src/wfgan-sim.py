@@ -198,7 +198,11 @@ def process_incoming(wfgan, outgoing_timestamps, incoming, ref_trace):
     ref_incoming = ref_trace[1::2]
     incoming_defended = []
     to_send = 0
-    start_t = 0
+
+    # some bad traces will have incoming packets for the first few packets.
+    # To avoid missing these packets, set a negative start_t
+    start_t = -0.001
+
     ref_ind = -1
     for outgoing_timestamp in outgoing_timestamps:
         # one outgoing burst corresponds to one incoming burst
@@ -248,8 +252,9 @@ def process_incoming(wfgan, outgoing_timestamps, incoming, ref_trace):
 
 
 def simulate(fdir, wfgan, outputdir):
+    np.random.seed(datetime.datetime.now().microsecond)
+    # np.random.seed(0)
     try:
-        np.random.seed(datetime.datetime.now().microsecond)
         trace = utils.loadTrace(fdir)
         ref_trace_len = len(trace) * 4
         ref_trace = []
@@ -268,7 +273,7 @@ def simulate(fdir, wfgan, outputdir):
             for time, direction in trace_defended:
                 f.write('{:.4f}\t{:.0f}\n'.format(time, direction))
     except Exception as e:
-        logger.error('Error in {}: {}'.format(fdir, e))
+        print('[ERR] Error in {}: {}'.format(fdir, e))
 
 
 if __name__ == '__main__':
