@@ -54,7 +54,7 @@ if __name__ == '__main__':
     # argumments
     args, logger = parse_args()
     cf = utils.read_conf(cm.confdir)
-
+    logger.info(args)
     # create folder
     pardir, modeldir, checkpointdir = init_directory(args.dir, tag='training_{}'.format(strftime('%m%d_%H%M%S')))
     logger.debug("Output to {}".format(pardir))
