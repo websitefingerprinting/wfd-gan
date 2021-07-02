@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from functools import partial
 import os
@@ -138,10 +139,11 @@ class WFGAN:
 
     def get_ipt(self, which='o2o'):
         assert (self.o2i_list is not None) and (self.o2o_list is not None)
+        # we make sure that the max time gap is less than 500 millisecond.
         if which == 'o2o':
-            return np.random.choice(self.o2o_list)
+            return min(np.random.choice(self.o2o_list), 0.5)
         elif which == 'o2i':
-            return np.random.choice(self.o2i_list)
+            return min(np.random.choice(self.o2i_list), 0.5)
         else:
             raise ValueError('Wrong option: {}'.format(which))
 
@@ -165,6 +167,7 @@ def process_outgoing(wfgan, last_t, outgoing, ref_outgoing):
     first_in = True
     ref_ind = -1
     outgoing_timestamps = []
+    outgoing_real_bursts = []
     while start_t < last_t or to_send > 0:
         ref_ind += 1
         if first_in:
@@ -175,6 +178,7 @@ def process_outgoing(wfgan, last_t, outgoing, ref_outgoing):
         to_send += int(sum(outgoing[np.where((outgoing[:, 0] > start_t) & (outgoing[:, 0] <= end_t))][:, 1]))
         should_send = 1.0 * ref_outgoing[ref_ind] / cm.CELL_SIZE
         should_send = adjust_burst_size(should_send, to_send, wfgan.tol)
+        outgoing_real_bursts.append(min(should_send, to_send))
         if should_send <= to_send:
             to_send -= should_send
             for _ in range(should_send):
@@ -189,13 +193,19 @@ def process_outgoing(wfgan, last_t, outgoing, ref_outgoing):
         outgoing_timestamps.append(end_t)
 
     outgoing_defended = np.array(outgoing_defended)
+    outgoing_burst_seqs = np.stack((outgoing_timestamps, outgoing_real_bursts), axis=-1)
     assert len(outgoing_defended[outgoing_defended[:, 1] == 1]) == len(outgoing)
-    return outgoing_defended, outgoing_timestamps
+    return outgoing_defended, outgoing_burst_seqs
 
-
-def process_incoming(wfgan, outgoing_timestamps, incoming, ref_trace):
+    
+def process_incoming(wfgan, outgoing_burst_seqs, old_cum_outgoing_num, incoming, ref_trace):
     ref_outgoing = ref_trace[::2]
     ref_incoming = ref_trace[1::2]
+    # time, size, sent_mask, cum_outgoing_bytes
+    # incoming_info_arr = np.concatenate((incoming, np.zeros((len(incoming), 1)), old_cum_outgoing_num.reshape(-1, 1)),
+    #                                    axis=1)
+    assert len(incoming) == len(old_cum_outgoing_num)
+    sent_mask = np.zeros(len(incoming))
     incoming_defended = []
     to_send = 0
 
@@ -204,11 +214,18 @@ def process_incoming(wfgan, outgoing_timestamps, incoming, ref_trace):
     start_t = -0.001
 
     ref_ind = -1
-    for outgoing_timestamp in outgoing_timestamps:
+    outgoing_sent_num = 0
+    for outgoing_timestamp, real_burst_size in outgoing_burst_seqs:
         # one outgoing burst corresponds to one incoming burst
+        outgoing_sent_num += real_burst_size
         ref_ind += 1
         end_t = max(outgoing_timestamp + wfgan.get_ipt('o2i'), start_t + 0.0001)
-        to_send += -int(sum(incoming[np.where((incoming[:, 0] > start_t) & (incoming[:, 0] <= end_t))][:, 1]))
+        # this is how many incoming packets:
+        # 1) in [0, end_t] 2) has not been sent 3) outgoing packets before them have been sent
+        condition = np.where((incoming[:, 0] <= end_t) & (sent_mask == 0) &
+                             (old_cum_outgoing_num <= outgoing_sent_num))
+        to_send += -int(sum(incoming[condition][:, 1]))
+        sent_mask[condition] = 1
         should_send = 1.0 * ref_incoming[ref_ind] / cm.CELL_SIZE
         should_send = adjust_burst_size(should_send, to_send, wfgan.tol)
         if should_send <= to_send:
@@ -222,9 +239,9 @@ def process_incoming(wfgan, outgoing_timestamps, incoming, ref_trace):
                 incoming_defended.append([end_t, -cm.DUMMY_CODE])
             to_send = 0
         start_t = end_t
-
+    assert outgoing_sent_num == sum(outgoing_burst_seqs[:, 1])
     # if there are still some remaining incoming ones, make sure to pad the tail
-    outgoing_t = outgoing_timestamps[-1]
+    outgoing_t = outgoing_burst_seqs[-1, 0]
     incoming_t = incoming_defended[-1][0]
     while to_send > 0:
         ref_ind += 1
@@ -251,21 +268,35 @@ def process_incoming(wfgan, outgoing_timestamps, incoming, ref_trace):
     return incoming_defended
 
 
+def get_cum_outgoing(trace):
+    res = []
+    cnt = 0
+    for pkt, direction in trace:
+        if direction > 0:
+            cnt += 1
+        else:
+            res.append(cnt)
+    assert len(res) == len(trace[trace[:, 1] < 0])
+    return np.array(res)
+
+
 def simulate(fdir, wfgan, outputdir):
     np.random.seed(datetime.datetime.now().microsecond)
     # np.random.seed(0)
     try:
         trace = utils.loadTrace(fdir)
-        ref_trace_len = len(trace) * 4
+        # how many outgoing cells before each incoming one. Used for pessimistic simulation
+        old_cum_outgoing_num = get_cum_outgoing(trace)
+        ref_trace_len = len(trace) * 10
         ref_trace = []
         while ref_trace_len >= 0:
             # get several ref trace so as to make sure that we have enough to use in the simulation
             tmp_trace = wfgan.get_ref_trace()
             ref_trace_len -= len(tmp_trace)
             ref_trace.extend(tmp_trace)
-        outgoing_defended, outgoing_timestamps = process_outgoing(wfgan, trace[-1, 0], trace[trace[:, 1] > 0],
+        outgoing_defended, outgoing_burst_seqs = process_outgoing(wfgan, trace[-1, 0], trace[trace[:, 1] > 0],
                                                                   ref_trace[::2])
-        incoming_defended = process_incoming(wfgan, outgoing_timestamps, trace[trace[:, 1] < 0], ref_trace)
+        incoming_defended = process_incoming(wfgan, outgoing_burst_seqs, old_cum_outgoing_num, trace[trace[:, 1] < 0], ref_trace)
         trace_defended = np.concatenate((outgoing_defended, incoming_defended), axis=0)
         trace_defended = trace_defended[trace_defended[:, 0].argsort()]
         fname = fdir.split('/')[-1]
