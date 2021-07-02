@@ -84,6 +84,7 @@ def load_dataset(dir):
     return X, y
 
 
+# deprecated
 def prepare_dataset(features, labels, config):
     """Pick data from a specific config
     Pick 0 ~ MON_SITE_NUM-1 classes, each one pick MON_INST_NUM instances,

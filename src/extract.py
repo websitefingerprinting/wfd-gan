@@ -10,6 +10,7 @@ import pandas as pd
 logger = utils.init_logger('extract')
 burst_reorder_threshold_t = [0.008, 0.001]
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Extract burst sequences ipt from raw traces')
 
@@ -38,7 +39,6 @@ def parse_arguments():
     return args
 
 
-
 def group_pkts(pkts):
     """Group packets into bursts, if time gap between two packets are less than threshold,
     then group together. The timestamp for a burst is the timestamp of the start packet.
@@ -51,7 +51,7 @@ def group_pkts(pkts):
     else:
         threshold = burst_reorder_threshold_t[1]
     for i in range(1, len(pkts)):
-        last_pkt = pkts[i-1]
+        last_pkt = pkts[i - 1]
         cur_pkt = pkts[i]
         if cur_pkt[0] - last_pkt[0] < threshold:
             cnt += cur_pkt[1]
@@ -135,7 +135,7 @@ if __name__ == '__main__':
     global MON_SITE_NUM, length
     # parser config and arguments
     args = parse_arguments()
-    length = args.length + 1 # add another feature as the real length of the trace
+    length = args.length + 1  # add another feature as the real length of the trace
     logger.info("Arguments: %s" % (args))
     outputdir = join(cm.outputdir, os.path.split(args.dir.rstrip('/'))[1], 'feature')
     if not os.path.exists(outputdir):
@@ -144,6 +144,8 @@ if __name__ == '__main__':
     cf = utils.read_conf(cm.confdir)
     MON_SITE_NUM = int(cf['monitored_site_num'])
     MON_INST_NUM = int(cf['monitored_inst_num'])
+    MON_SITE_START_IND = int(cf['monitored_site_start_ind'])
+    MON_INST_START_IND = int(cf['monitored_inst_start_ind'])
     if cf['open_world'] == '1':
         UNMON_SITE_NUM = int(cf['unmonitored_site_num'])
         OPEN_WORLD = 1
@@ -154,13 +156,14 @@ if __name__ == '__main__':
     # logger.info('Extracting features...')
 
     flist = []
-    for i in range(MON_SITE_NUM):
-        for j in range(MON_INST_NUM):
+    for i in range(MON_SITE_START_IND, MON_SITE_START_IND + MON_SITE_NUM):
+        for j in range(MON_INST_START_IND, MON_INST_START_IND + MON_INST_NUM):
             if os.path.exists(os.path.join(args.dir, str(i) + "-" + str(j) + args.format)):
                 flist.append(os.path.join(args.dir, str(i) + "-" + str(j) + args.format))
-    for i in range(UNMON_SITE_NUM):
-        if os.path.exists(os.path.join(args.dir, str(i) + args.format)):
-            flist.append(os.path.join(args.dir, str(i) + args.format))
+                # do not support open world set.
+    # for i in range(UNMON_SITE_NUM):
+    #     if os.path.exists(os.path.join(args.dir, str(i) + args.format)):
+    #         flist.append(os.path.join(args.dir, str(i) + args.format))
 
     raw_data_dict = parallel(flist)
     bursts, times, labels = zip(*raw_data_dict)
@@ -168,7 +171,11 @@ if __name__ == '__main__':
     labels = np.array(labels)
     logger.info("feature sizes:{}, label size:{}".format(bursts.shape, labels.shape))
     np.savez_compressed(join(outputdir, "raw_feature.npz"), features=bursts, labels=labels)
-    logger.info("output to {}".format(join(outputdir, "raw_feature.npz")))
+    logger.info("output to {}".format(join(outputdir, "raw_feature_{}-{}x{}-{}.npz".
+                                           format(MON_SITE_START_IND, MON_SITE_START_IND + MON_SITE_NUM,
+                                                  MON_INST_START_IND, MON_INST_NUM + MON_INST_START_IND))))
 
     # save the time information. The even indexes are outgoing timestamps and the odd indexes are incoming ones.
-    np.savez(join(outputdir, "time_feature.npz"), *times)
+    np.savez(join(outputdir, "time_feature_{}-{}x{}-{}.npz").
+             format(MON_SITE_START_IND, MON_SITE_START_IND + MON_SITE_NUM, MON_INST_START_IND,
+                    MON_INST_NUM + MON_INST_START_IND), *times)

@@ -60,13 +60,17 @@ if __name__ == '__main__':
     logger.debug("Output to {}".format(pardir))
     # Configure data loader
     X, y = utils.load_dataset(args.dir)
-    X, y = utils.prepare_dataset(X, y, cf)
-    logger.info("Loaded dataset:{}, min burst:{} max burst:{}".format(X.shape, X.min(), X.max()))
+    logger.info("Loaded dataset:{}, min burst:{} max burst:{}, min label:{}, max label:{}"
+                .format(X.shape, X.min(), X.max(), y.min(), y.max()))
+
+    MON_SITE_START_IND = cf['monitored_site_start_ind']
+    y -= MON_SITE_START_IND
+
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)
     X = torch.from_numpy(X)
     y = torch.from_numpy(y)
-    class_dim = y.max() + 1  # index start from 0
+    class_dim = len(np.unique(y)) # index start from 0
     seq_len = X.size(1)
     assert seq_len > 1
     assert class_dim > 1
