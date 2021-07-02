@@ -62,9 +62,8 @@ if __name__ == '__main__':
     X, y = utils.load_dataset(args.dir)
     logger.info("Loaded dataset:{}, min burst:{} max burst:{}, min label:{}, max label:{}"
                 .format(X.shape, X.min(), X.max(), y.min(), y.max()))
-
-    MON_SITE_START_IND = cf['monitored_site_start_ind']
-    y -= MON_SITE_START_IND
+    # reindex label starting from 0
+    y -= y.min()
 
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)

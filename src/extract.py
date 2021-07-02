@@ -146,12 +146,12 @@ if __name__ == '__main__':
     MON_INST_NUM = int(cf['monitored_inst_num'])
     MON_SITE_START_IND = int(cf['monitored_site_start_ind'])
     MON_INST_START_IND = int(cf['monitored_inst_start_ind'])
-    if cf['open_world'] == '1':
-        UNMON_SITE_NUM = int(cf['unmonitored_site_num'])
-        OPEN_WORLD = 1
-    else:
-        OPEN_WORLD = 0
-        UNMON_SITE_NUM = 0
+    # if cf['open_world'] == '1':
+    #     UNMON_SITE_NUM = int(cf['unmonitored_site_num'])
+    #     OPEN_WORLD = 1
+    # else:
+    #     OPEN_WORLD = 0
+    #     UNMON_SITE_NUM = 0
 
     # logger.info('Extracting features...')
 
@@ -160,11 +160,11 @@ if __name__ == '__main__':
         for j in range(MON_INST_START_IND, MON_INST_START_IND + MON_INST_NUM):
             if os.path.exists(os.path.join(args.dir, str(i) + "-" + str(j) + args.format)):
                 flist.append(os.path.join(args.dir, str(i) + "-" + str(j) + args.format))
-                # do not support open world set.
+    # do not support open world set.
     # for i in range(UNMON_SITE_NUM):
     #     if os.path.exists(os.path.join(args.dir, str(i) + args.format)):
     #         flist.append(os.path.join(args.dir, str(i) + args.format))
-
+    logger.info('In total {} files.'.format(len(flist)))
     raw_data_dict = parallel(flist)
     bursts, times, labels = zip(*raw_data_dict)
     bursts = np.array(bursts)
