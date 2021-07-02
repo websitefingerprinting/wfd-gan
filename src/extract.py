@@ -170,7 +170,10 @@ if __name__ == '__main__':
     bursts = np.array(bursts)
     labels = np.array(labels)
     logger.info("feature sizes:{}, label size:{}".format(bursts.shape, labels.shape))
-    np.savez_compressed(join(outputdir, "raw_feature.npz"), features=bursts, labels=labels)
+    np.savez_compressed(
+        join(outputdir, "raw_feature_{}-{}x{}-{}.npz".format(MON_SITE_START_IND, MON_SITE_START_IND + MON_SITE_NUM,
+                                                             MON_INST_START_IND, MON_INST_NUM + MON_INST_START_IND)),
+        features=bursts, labels=labels)
     logger.info("output to {}".format(join(outputdir, "raw_feature_{}-{}x{}-{}.npz".
                                            format(MON_SITE_START_IND, MON_SITE_START_IND + MON_SITE_NUM,
                                                   MON_INST_START_IND, MON_INST_NUM + MON_INST_START_IND))))
