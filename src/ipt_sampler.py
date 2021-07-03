@@ -73,7 +73,9 @@ if __name__ == '__main__':
     o2o, o2i = prepare_dataset(raw_dataset)
     ipt_dataset = {'o2o': o2o, 'o2i': o2i}
     outputdir = args.tdir.split('.npz')[0]
-
+    if not os.path.exists(outputdir):
+        os.makedirs(outputdir)
+        
     logger.info("KDE modeling...")
     pdf = {}
     for key in ipt_dataset.keys():
