@@ -22,7 +22,7 @@ device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 
 k = 2
 p = 6
-
+w_dist_threshold = 0.01
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -180,7 +180,7 @@ if __name__ == '__main__':
             "[Epoch %2d/%2d] [D loss: %.4f] [G loss: %.4f] [w dist: %.4f]"
             % (epoch + 1, args.n_epochs, discriminator_loss_epoch, generator_loss_epoch, w_dist_epoch)
         )
-        if (epoch == 0) or (epoch + 1) % args.freq == 0:
+        if (epoch == 0) or (epoch + 1) % args.freq == 0 or w_dist_epoch <= w_dist_threshold:
             # every args.freq epoch, checkpoint
             total_real = np.array(total_real)
             total_fake = np.array(total_fake)
@@ -194,6 +194,10 @@ if __name__ == '__main__':
         loss_checkpoints['generator'].append(generator_loss_epoch)
         loss_checkpoints['discriminator'].append(discriminator_loss_epoch)
         loss_checkpoints['dist'].append(w_dist_epoch)
+        if w_dist_epoch <= w_dist_threshold:
+            logger.info('Early stopping since the w-dist {} is less than {}.'.format(w_dist_epoch, w_dist_threshold))
+            break
+
     np.savez_compressed(join(checkpointdir, "loss.npz".format(loss_checkpoints)),
                         generator=loss_checkpoints['generator'], discriminator=loss_checkpoints['discriminator'],
                         dist=loss_checkpoints['dist'])

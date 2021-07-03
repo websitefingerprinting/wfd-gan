@@ -72,7 +72,7 @@ if __name__ == '__main__':
     raw_dataset = np.load(args.tdir)
     o2o, o2i = prepare_dataset(raw_dataset)
     ipt_dataset = {'o2o': o2o, 'o2i': o2i}
-    outputdir, _ = os.path.split(args.tdir)
+    outputdir = args.tdir.split('.npz')[0]
 
     logger.info("KDE modeling...")
     pdf = {}
