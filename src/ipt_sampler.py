@@ -100,7 +100,9 @@ if __name__ == '__main__':
         # resampled_data = np.random.choice(log_ipt, size=args.n, replace=True)
         # resampled_data = resampled_data + np.random.randn(args.n) * kernel_std
         # resampled_data = 10 ** resampled_data
-        with open(join(outputdir, '{}.txt'.format(key)), 'w') as f:
+
+        prefix = args.tdir.split('.npz')[0]
+        with open(join(outputdir, '{}_{}.ipt'.format(prefix, key)), 'w') as f:
             f.write('Log scale, in seconds. The first is the kernal std. Rest are real log(ipts).')
             f.write('{:.6f}\n'.format(kernel_std))
             for data in resampled_data:
