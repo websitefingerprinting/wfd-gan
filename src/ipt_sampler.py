@@ -62,7 +62,7 @@ def prepare_dataset(data):
     for o2o, o2i in res:
         o2os.extend(o2o)
         o2is.extend(o2i)
-    return np.array(o2o), np.array(o2i)
+    return np.array(o2os), np.array(o2is)
 
 
 if __name__ == '__main__':
@@ -73,37 +73,35 @@ if __name__ == '__main__':
     o2o, o2i = prepare_dataset(raw_dataset)
     ipt_dataset = {'o2o': o2o, 'o2i': o2i}
     logger.info("Have {} o2o and {} o2i".format(len(o2o), len(o2i)))
-    outputdir = args.tdir.split('.npz')[0]
-    if not os.path.exists(outputdir):
-        os.makedirs(outputdir)
-        
-    logger.info("KDE modeling...")
-    pdf = {}
-    for key in ipt_dataset.keys():
-        data = ipt_dataset[key]
-        data[data < 1e-6] = 1e-6
-        log_ipt = np.log10(data)
-        x, y = FFTKDE(kernel='gaussian', bw='ISJ').fit(log_ipt).evaluate()
-        pdf[key] = [x, y]
-    # 'The data is in log scale (seconds).'
-    np.savez_compressed(join(outputdir, 'pdf.npz'), o2o=pdf['o2o'], o2i=pdf['o2i'])
+    prefix = args.tdir.split('.npz')[0]
+    np.savez_compressed('{}_ipt.npz'.format(prefix), o2o=o2o, o2i=o2i)
+    logger.info('Save ipt info to {}'.format('{}_ipt.npz'.format(prefix)))
+    # logger.info("KDE modeling...")
+    # pdf = {}
+    # for key in ipt_dataset.keys():
+    #     data = ipt_dataset[key]
+    #     data[data < 1e-6] = 1e-6
+    #     log_ipt = np.log10(data)
+    #     x, y = FFTKDE(kernel='gaussian', bw='ISJ').fit(log_ipt).evaluate()
+    #     pdf[key] = [x, y]
+    # # 'The data is in log scale (seconds).'
+    # np.savez_compressed(join(outputdir, 'pdf.npz'), o2o=pdf['o2o'], o2i=pdf['o2i'])
 
-    logger.info("Resampling data")
+    logger.info("Computing Kernel")
     for key in ipt_dataset.keys():
         data = ipt_dataset[key]
         data[data == 0] = 1e-6
         log_ipt = np.log10(data)
         kernel_std = improved_sheather_jones(log_ipt.reshape(-1, 1))  # Shape (obs, dims)
         # sample a part of the original data points
-        resampled_data = np.random.choice(data, size=min(args.n, len(data)), replace=False)
+        resampled_data = np.random.choice(log_ipt, size=min(args.n, len(log_ipt)), replace=False)
         # # (1) First resample original data, then (2) add noise from kernel
         # resampled_data = np.random.choice(log_ipt, size=args.n, replace=True)
         # resampled_data = resampled_data + np.random.randn(args.n) * kernel_std
         # resampled_data = 10 ** resampled_data
 
-        prefix = args.tdir.split('.npz')[0]
-        with open(join(outputdir, '{}_{}.ipt'.format(prefix, key)), 'w') as f:
-            f.write('Log scale, in seconds. The first is the kernal std. Rest are real log(ipts).')
+        with open('{}_{}.ipt'.format(prefix, key), 'w') as f:
+            f.write('# Log scale, in seconds. The first is the kernal std. Rest are real log(ipts).\n')
             f.write('{:.6f}\n'.format(kernel_std))
             for data in resampled_data:
                 f.write("{:.6f}\n".format(data))
