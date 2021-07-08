@@ -72,6 +72,7 @@ if __name__ == '__main__':
     raw_dataset = np.load(args.tdir)
     o2o, o2i = prepare_dataset(raw_dataset)
     ipt_dataset = {'o2o': o2o, 'o2i': o2i}
+    logger.info("Have {} o2o and {} o2i".format(len(o2o), len(o2i)))
     outputdir = args.tdir.split('.npz')[0]
     if not os.path.exists(outputdir):
         os.makedirs(outputdir)
@@ -93,10 +94,14 @@ if __name__ == '__main__':
         data[data == 0] = 1e-6
         log_ipt = np.log10(data)
         kernel_std = improved_sheather_jones(log_ipt.reshape(-1, 1))  # Shape (obs, dims)
-        # (1) First resample original data, then (2) add noise from kernel
-        resampled_data = np.random.choice(log_ipt, size=args.n, replace=True)
-        resampled_data = resampled_data + np.random.randn(args.n) * kernel_std
-        resampled_data = 10 ** resampled_data
+        # sample a part of the original data points
+        resampled_data = np.random.choice(data, size=min(args.n, len(data)), replace=False)
+        # # (1) First resample original data, then (2) add noise from kernel
+        # resampled_data = np.random.choice(log_ipt, size=args.n, replace=True)
+        # resampled_data = resampled_data + np.random.randn(args.n) * kernel_std
+        # resampled_data = 10 ** resampled_data
         with open(join(outputdir, '{}.txt'.format(key)), 'w') as f:
+            f.write('Log scale, in seconds. The first is the kernal std. Rest are real log(ipts).')
+            f.write('{:.6f}\n'.format(kernel_std))
             for data in resampled_data:
                 f.write("{:.6f}\n".format(data))
