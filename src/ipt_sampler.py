@@ -90,11 +90,11 @@ if __name__ == '__main__':
     logger.info("Computing Kernel")
     for key in ipt_dataset.keys():
         data = ipt_dataset[key]
+        data = np.random.choice(data, size=min(args.n, len(data)), replace=False)
         data[data == 0] = 1e-6
         log_ipt = np.log10(data)
         kernel_std = improved_sheather_jones(log_ipt.reshape(-1, 1))  # Shape (obs, dims)
         # sample a part of the original data points
-        resampled_data = np.random.choice(log_ipt, size=min(args.n, len(log_ipt)), replace=False)
         # # (1) First resample original data, then (2) add noise from kernel
         # resampled_data = np.random.choice(log_ipt, size=args.n, replace=True)
         # resampled_data = resampled_data + np.random.randn(args.n) * kernel_std
@@ -103,5 +103,5 @@ if __name__ == '__main__':
         with open('{}_{}.ipt'.format(prefix, key), 'w') as f:
             f.write('# Log scale, in seconds. The first is the kernal std. Rest are real log(ipts).\n')
             f.write('{:.6f}\n'.format(kernel_std))
-            for data in resampled_data:
-                f.write("{:.6f}\n".format(data))
+            for ipt in log_ipt:
+                f.write("{:.6f}\n".format(ipt))
