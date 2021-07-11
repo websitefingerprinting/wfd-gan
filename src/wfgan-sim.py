@@ -28,7 +28,8 @@ def parse_args():
                              'models and data scaler.')
     parser.add_argument('--ipt',
                         required=True,
-                        help='Path of ipt info.')
+                        nargs='+',
+                        help='Path of ipt info. The first is o2o, the second is o2i (o2i is optional.)')
     parser.add_argument('--tol',
                         default=0,
                         type=float,
@@ -81,6 +82,13 @@ def init():
     return args, logger, cf, outputdir, flist
 
 
+def sample_kde(kernel_std, arr):
+    # sample and convert to seconds
+    sampled = np.random.choice(arr) + np.random.randn() * kernel_std
+    sampled = 10 ** sampled
+    return sampled
+
+
 class WFGAN:
     def __init__(self, tol):
         self.tol = tol
@@ -108,12 +116,19 @@ class WFGAN:
         self.latent_dim = int(info['latentdim'])
 
     def load_ipt(self, ipt_dir):
-        with open(join(ipt_dir, 'o2o.txt'), 'r') as f:
-            o2o_list = pd.Series(f.readlines()).str.slice(0, -1).astype(float)
+        assert len(ipt_dir) >= 1
+        with open(ipt_dir[0], 'r') as f:
+            o2o_list = pd.Series(f.readlines()[1:]).str.slice(0, -1).astype(float)
         self.o2o_list = np.array(o2o_list)
-        with open(join(ipt_dir, 'o2i.txt'), 'r') as f:
-            o2i_list = pd.Series(f.readlines()).str.slice(0, -1).astype(float)
-        self.o2i_list = np.array(o2i_list)
+        logger.info('o2o is loaded.')
+        if len(ipt_dir) > 1:
+            with open(join(ipt_dir[1]), 'r') as f:
+                o2i_list = pd.Series(f.readlines()[1:]).str.slice(0, -1).astype(float)
+            self.o2i_list = np.array(o2i_list)
+            logger.info('o2i is loaded.')
+        else:
+            logger.info("O2i is not given.")
+            self.o2i_list = None
 
     def get_ref_trace(self):
         assert self.model
@@ -138,12 +153,21 @@ class WFGAN:
             return list(synthesized_x)
 
     def get_ipt(self, which='o2o'):
-        assert (self.o2i_list is not None) and (self.o2o_list is not None)
+        assert self.o2o_list is not None
         # we make sure that the max time gap is less than 500 millisecond.
+        # The first element is kernel std, the rest are the real data
+        # unit is seconds in log scale
         if which == 'o2o':
-            return min(np.random.choice(self.o2o_list), 0.5)
+            sampled = sample_kde(self.o2o_list[0], self.o2o_list[1:])
+            return min(sampled, 0.5)
         elif which == 'o2i':
-            return min(np.random.choice(self.o2i_list), 0.5)
+            if self.o2i_list is not None:
+                sampled = sample_kde(self.o2i_list[0], self.o2i_list[1:])
+                return min(sampled, 0.5)
+            else:
+                # assume a 200 ms RTT with 10ms std
+                sampled = np.random.normal(200, 10)/1000
+                return min(max(0.0, sampled), 0.5)
         else:
             raise ValueError('Wrong option: {}'.format(which))
 
