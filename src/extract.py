@@ -113,7 +113,7 @@ def extract(trace):
     return bursts, times
 
 
-def parallel(flist, n_jobs=2):
+def parallel(flist, n_jobs=70):
     with mp.Pool(n_jobs) as p:
         res = p.map(extractfeature, flist)
         p.close()
