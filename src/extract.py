@@ -73,7 +73,9 @@ def get_burst(trace):
         start += 1
         if size > 0:
             break
-    burst_seqs = trace[start:].copy()
+
+    trace = trace[start:].copy()
+    burst_seqs = trace
     # outgoing_burst_seqs = group_pkts(trace[trace[:, 1] > 0])
     # incoming_burst_seqs = group_pkts(trace[trace[:, 1] < 0])
     # burst_seqs = np.concatenate((outgoing_burst_seqs, incoming_burst_seqs), axis=0)
