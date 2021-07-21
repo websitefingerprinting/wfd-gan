@@ -20,7 +20,7 @@ def parse_arguments():
                         help='Path to the directory with the traffic traces to be simulated.')
     parser.add_argument('--length',
                         type=int,
-                        default=1000,
+                        default=1200,
                         help='Pad to length.'
                         )
     parser.add_argument('--format',
@@ -39,31 +39,31 @@ def parse_arguments():
     return args
 
 
-def group_pkts(pkts):
-    """Group packets into bursts, if time gap between two packets are less than threshold,
-    then group together. The timestamp for a burst is the timestamp of the start packet.
-    """
-    burst_seq = []
-    cnt = pkts[0, 1]
-    start_time = pkts[0, 0]
-    if cnt > 0:
-        threshold = burst_reorder_threshold_t[0]
-    else:
-        threshold = burst_reorder_threshold_t[1]
-    for i in range(1, len(pkts)):
-        last_pkt = pkts[i - 1]
-        cur_pkt = pkts[i]
-        if cur_pkt[0] - last_pkt[0] < threshold:
-            cnt += cur_pkt[1]
-        else:
-            burst_seq.append([start_time, cnt])
-            cnt = cur_pkt[1]
-            start_time = cur_pkt[0]
-    burst_seq.append([start_time, cnt])
-    burst_seq = np.array(burst_seq)
-
-    assert sum(burst_seq[:, 1]) == sum(pkts[:, 1])
-    return burst_seq
+# def group_pkts(pkts):
+#     """Group packets into bursts, if time gap between two packets are less than threshold,
+#     then group together. The timestamp for a burst is the timestamp of the start packet.
+#     """
+#     burst_seq = []
+#     cnt = pkts[0, 1]
+#     start_time = pkts[0, 0]
+#     if cnt > 0:
+#         threshold = burst_reorder_threshold_t[0]
+#     else:
+#         threshold = burst_reorder_threshold_t[1]
+#     for i in range(1, len(pkts)):
+#         last_pkt = pkts[i - 1]
+#         cur_pkt = pkts[i]
+#         if cur_pkt[0] - last_pkt[0] < threshold:
+#             cnt += cur_pkt[1]
+#         else:
+#             burst_seq.append([start_time, cnt])
+#             cnt = cur_pkt[1]
+#             start_time = cur_pkt[0]
+#     burst_seq.append([start_time, cnt])
+#     burst_seq = np.array(burst_seq)
+#
+#     assert sum(burst_seq[:, 1]) == sum(pkts[:, 1])
+#     return burst_seq
 
 
 def get_burst(trace):
@@ -73,12 +73,12 @@ def get_burst(trace):
         start += 1
         if size > 0:
             break
-    trace = trace[start:].copy()
-    outgoing_burst_seqs = group_pkts(trace[trace[:, 1] > 0])
-    incoming_burst_seqs = group_pkts(trace[trace[:, 1] < 0])
-    burst_seqs = np.concatenate((outgoing_burst_seqs, incoming_burst_seqs), axis=0)
-    assert len(burst_seqs) == len(outgoing_burst_seqs) + len(incoming_burst_seqs)
-    burst_seqs = burst_seqs[burst_seqs[:, 0].argsort()]
+    burst_seqs = trace[start:].copy()
+    # outgoing_burst_seqs = group_pkts(trace[trace[:, 1] > 0])
+    # incoming_burst_seqs = group_pkts(trace[trace[:, 1] < 0])
+    # burst_seqs = np.concatenate((outgoing_burst_seqs, incoming_burst_seqs), axis=0)
+    # assert len(burst_seqs) == len(outgoing_burst_seqs) + len(incoming_burst_seqs)
+    # burst_seqs = burst_seqs[burst_seqs[:, 0].argsort()]
 
     # merge bursts from the same direction
     merged_burst_seqs = []
@@ -111,7 +111,7 @@ def extract(trace):
     return bursts, times
 
 
-def parallel(flist, n_jobs=80):
+def parallel(flist, n_jobs=2):
     with mp.Pool(n_jobs) as p:
         res = p.map(extractfeature, flist)
         p.close()
