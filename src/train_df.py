@@ -74,18 +74,18 @@ if __name__ == '__main__':
 
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)
-    X = torch.from_numpy(X)
-    y = torch.from_numpy(y)
     num_classes = class_dim = len(np.unique(y))  # index start from 0
-    seq_len = X.size(1)
+
+    if len(X.shape) < 3:
+        X = X[:, np.newaxis, :]
+    X = torch.from_numpy(X).float()
+    y = torch.from_numpy(y)
+    seq_len = X.size(2)
     assert seq_len > 1
     assert class_dim > 1
     logger.info("X shape {}, y shape {}, class num: {}".format(X.shape, y.shape, class_dim))
 
-    X = torch.from_numpy(X).permute(0, 2, 1)
-    y = torch.from_numpy(y)
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42, stratify=y)
 
     train_dataset = Data.TensorDataset(X_train, y_train)
     test_dataset = Data.TensorDataset(X_test, y_test)
@@ -129,16 +129,29 @@ if __name__ == '__main__':
         # Test the model
         model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
         with torch.no_grad():
-            correct = 0
-            total = 0
+            correct_train = 0
+            total_train = 0
+            for batch_x, batch_y in train_loader:
+                batch_x = batch_x.to(device)
+                batch_y = batch_y.to(device)
+                outputs = model(batch_x)
+                _, predicted = torch.max(outputs.data, 1)
+                total_train += batch_y.size(0)
+                correct_train += (predicted == batch_y).sum().item()
+
+            correct_test = 0
+            total_test = 0
             for batch_x, batch_y in test_loader:
                 batch_x = batch_x.to(device)
                 batch_y = batch_y.to(device)
                 outputs = model(batch_x)
                 _, predicted = torch.max(outputs.data, 1)
-                total += batch_y.size(0)
-                correct += (predicted == batch_y).sum().item()
-        logger.info("Epoch [{}/{}] val accuracy: {:.4f}".format(epoch + 1, 1.0 * num_epochs, correct / total))
+                total_test += batch_y.size(0)
+                correct_test += (predicted == batch_y).sum().item()
+        logger.info("Epoch [{}/{}] train acc: {:.4f} val accuracy: {:.4f}".format(
+            epoch + 1, num_epochs, correct_train / total_train ,correct_test / total_test))
 
     fname = args.dir.split('/')[-1].split('.')[0]
-    torch.save(model.state_dict(), join(cm.dModelDir, 'df_{}.ckpt'.format(fname)))
+    model_saved_path = join(cm.dModelDir, 'df_{}.ckpt'.format(fname))
+    torch.save(model.state_dict(), model_saved_path)
+    logger.info("Model is saved to {}".format(model_saved_path))

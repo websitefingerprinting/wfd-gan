@@ -3,3 +3,4 @@ dump
 notebook
 src/__pycache__
 src/obsolete
+d_model/*.ckpt
