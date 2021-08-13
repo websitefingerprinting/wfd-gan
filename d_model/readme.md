@@ -1,0 +1,1 @@
+This folder saves pretrained DF discriminator
