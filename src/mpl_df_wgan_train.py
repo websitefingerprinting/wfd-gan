@@ -38,6 +38,7 @@ def parse_args():
     parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
     parser.add_argument("--latent_dim", type=int, default=50, help="dimensionality of the latent space")
     parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
+    parser.add_argument("--alpha", type=float, default=1.0, help="Ratio of f loss")
     parser.add_argument("--freq", type=int, default=20, help="Checkpoint every freq epochs")
     args = parser.parse_args()
     logger = utils.init_logger('gan')
@@ -57,6 +58,7 @@ def init_directory(dir, tag=""):
 
 def test_DF_acc_epoch(model, X, y):
     X = torch.from_numpy(np.array(X)[:, 1:]).float()
+    X = X[:, np.newaxis, :]
     y = torch.from_numpy(np.array(y))
     dataset = Data.TensorDataset(X, y)
     dataloader = torch.utils.data.DataLoader(
@@ -121,6 +123,7 @@ if __name__ == '__main__':
     if torch.cuda.is_available():
         generator.cuda()
         discriminator.cuda()
+        f_model.cuda()
 
     # Optimizers
     optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=args.lr)
@@ -136,12 +139,14 @@ if __name__ == '__main__':
         total_c = []
         generator_g_loss_epoch = 0
         generator_f_loss_epoch = 0
+        generator_loss_combined_epoch = 0
         discriminator_loss_epoch = 0
         w_dist_epoch = 0
         for i, (traces, c) in enumerate(dataloader):
             # Configure input
             real_traces = Variable(traces.type(Tensor), requires_grad=True)
             c_onehot = Variable(Tensor(np.eye(class_dim)[c]))
+            c = Variable(c.type(LongTensor))
 
             # ---------------------
             #  Train Discriminator
@@ -199,28 +204,30 @@ if __name__ == '__main__':
                 fake_traces = generator(z, c_onehot)
                 total_real.extend(traces.cpu().numpy())
                 total_fake.extend(fake_traces.detach().cpu().numpy())
-                total_c.extend(c)
+                total_c.extend(c.detach().cpu().numpy())
                 # Loss measures generator's ability to fool the discriminator
                 # Train on fake traces
-                fake_validity = discriminator(fake_traces, c)
+                fake_validity = discriminator(fake_traces, c_onehot)
                 g_loss = -torch.mean(fake_validity)
 
                 # compute f_loss
                 fake_traces_converted = fake_traces[:, 1:]
+                fake_traces_converted = fake_traces_converted.reshape(fake_traces_converted.size(0), 1,
+                                                                      fake_traces_converted.size(1))
                 outputs = f_model(fake_traces_converted)
                 f_loss = criterion(outputs, c)
 
-                gf_loss = g_loss + f_loss
+                g_loss_combined = g_loss + args.alpha * f_loss
 
                 generator_g_loss_epoch += g_loss.item() / (len(dataloader) // args.n_critic)
                 generator_f_loss_epoch += f_loss.item() / (len(dataloader) // args.n_critic)
+                generator_loss_combined_epoch += g_loss_combined.item() / (len(dataloader) // args.n_critic)
 
-                gf_loss.backward()
+                g_loss_combined.backward()
 
                 optimizer_G.step()
 
         # Test DF accuracy
-        logger.debug("Test DF accuracy")
         df_acc = test_DF_acc_epoch(f_model, total_fake, total_c)
 
         logger.info(
@@ -233,7 +240,7 @@ if __name__ == '__main__':
             # every args.freq epoch, checkpoint
             total_real = np.array(total_real)
             total_fake = np.array(total_fake)
-            total_c = np.array(total_c).argmax(axis=1)
+            total_c = np.array(total_c)
             total_real = scaler.inverse_transform(total_real)
             total_fake = scaler.inverse_transform(total_fake)
             logger.debug(

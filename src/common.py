@@ -3,7 +3,7 @@ from os.path import join, abspath, dirname, pardir
 BASE_DIR = abspath(join(dirname(__file__), pardir))
 confdir = join(BASE_DIR, 'conf.ini')
 outputdir = join(BASE_DIR, 'dump')
-dModelDir = join(BASE_DIR, 'd_model')
+dModelDir = join(BASE_DIR, 'f_model')
 LOG_FORMAT = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
 
 # Loss weight for gradient penalty
