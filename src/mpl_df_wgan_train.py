@@ -231,9 +231,9 @@ if __name__ == '__main__':
         df_acc = test_DF_acc_epoch(f_model, total_fake, total_c)
 
         logger.info(
-            "[Epoch %2d/%2d] [D loss: %.4f] [G loss: %.4f + %.4f] [DF acc: %.4f] [w dist: %.4f]"
+            "[Epoch %2d/%2d] [D loss: %.4f] [G loss: %.4f + %.4f / %.4f] [DF acc: %.4f] [w dist: %.4f]"
             % (epoch + 1, args.n_epochs, discriminator_loss_epoch, generator_g_loss_epoch, generator_f_loss_epoch,
-               df_acc, w_dist_epoch)
+               generator_loss_combined_epoch, df_acc, w_dist_epoch)
         )
 
         if (epoch == 0) or (epoch + 1) % args.freq == 0 or w_dist_epoch <= w_dist_threshold:
