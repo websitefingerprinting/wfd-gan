@@ -24,12 +24,16 @@ k = 2
 p = 6
 w_dist_threshold = 0.01
 
+Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dir", required=True, help="Dataset directory.")
+    parser.add_argument("--f_model", type=str, required=True, help="The directory of the pre-trained DF.")
     parser.add_argument("--n_epochs", type=int, default=300, help="number of epochs of training")
     parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
-    parser.add_argument("--d_model", type=str, required=True, help="The directory of the pre-trained discriminator.")
     parser.add_argument("--lr", type=float, default=0.0002, help="learning rate")
     parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
     parser.add_argument("--latent_dim", type=int, default=50, help="dimensionality of the latent space")
@@ -51,6 +55,30 @@ def init_directory(dir, tag=""):
     return join(basedir, tag), modeldir, checkpointdir
 
 
+def test_DF_acc_epoch(model, X, y):
+    X = torch.from_numpy(np.array(X)[:, 1:]).float()
+    y = torch.from_numpy(np.array(y))
+    dataset = Data.TensorDataset(X, y)
+    dataloader = torch.utils.data.DataLoader(
+        dataset=dataset,
+        num_workers=1,
+        batch_size=128,
+        shuffle=False,
+    )
+
+    model.eval()
+    total = 0.0
+    correct = 0
+    for _, (batch_x, batch_y) in enumerate(dataloader):
+        batch_x = Variable(batch_x.type(Tensor), requires_grad=False)
+        batch_y = Variable(batch_y.type(LongTensor), requires_grad=False)
+        outputs = model(batch_x)
+        _, predicted = torch.max(outputs.data, 1)
+        total += batch_y.size(0)
+        correct += (predicted == batch_y).sum().item()
+    return correct / total
+
+
 if __name__ == '__main__':
     # argumments
     args, logger = parse_args()
@@ -70,7 +98,7 @@ if __name__ == '__main__':
     X = scaler.fit_transform(X)
     X = torch.from_numpy(X)
     y = torch.from_numpy(y)
-    class_dim = len(np.unique(y)) # index start from 0
+    class_dim = len(np.unique(y))  # index start from 0
     seq_len = X.size(1)
     assert seq_len > 1
     assert class_dim > 1
@@ -85,8 +113,11 @@ if __name__ == '__main__':
 
     # Initialize generator and discriminator
     generator = Generator(seq_len, class_dim, args.latent_dim)
-    discriminator = DF(seq_len, class_dim)
-    discriminator.load_state_dict(torch.load(args.d_model, map_location=device))
+    discriminator = Discriminator(seq_len, class_dim)
+    f_model = DF(seq_len - 1, class_dim)  # remove the number_of_burst feature, so #feature - 1
+    f_model.load_state_dict(torch.load(args.f_model, map_location=device))
+    f_model.eval()
+
     if torch.cuda.is_available():
         generator.cuda()
         discriminator.cuda()
@@ -95,21 +126,22 @@ if __name__ == '__main__':
     optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=args.lr)
     optimizer_D = torch.optim.RMSprop(discriminator.parameters(), lr=args.lr)
 
-    Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-    LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
+    # F model criterion
+    criterion = nn.CrossEntropyLoss()
 
     loss_checkpoints = {'generator': [], 'discriminator': [], 'dist': []}
     for epoch in range(args.n_epochs):
         total_real = []
         total_fake = []
         total_c = []
-        generator_loss_epoch = 0
+        generator_g_loss_epoch = 0
+        generator_f_loss_epoch = 0
         discriminator_loss_epoch = 0
         w_dist_epoch = 0
         for i, (traces, c) in enumerate(dataloader):
             # Configure input
             real_traces = Variable(traces.type(Tensor), requires_grad=True)
-            c = Variable(Tensor(np.eye(class_dim)[c]))
+            c_onehot = Variable(Tensor(np.eye(class_dim)[c]))
 
             # ---------------------
             #  Train Discriminator
@@ -120,11 +152,11 @@ if __name__ == '__main__':
             # Sample noise as generator input
             z = Variable(Tensor(np.random.normal(0, 1, (traces.shape[0], args.latent_dim))))
             # Generate a batch of traces
-            fake_traces = generator(z, c)
+            fake_traces = generator(z, c_onehot)
             # Real traces
-            real_validity = discriminator(real_traces, c)
+            real_validity = discriminator(real_traces, c_onehot)
             # Fake traces
-            fake_validity = discriminator(fake_traces, c)
+            fake_validity = discriminator(fake_traces, c_onehot)
 
             # Compute W-div gradient penalty
             real_grad_out = Variable(Tensor(real_traces.size(0), 1).fill_(1.0), requires_grad=False)
@@ -164,24 +196,39 @@ if __name__ == '__main__':
                 # -----------------
 
                 # Generate a batch of traces
-                fake_traces = generator(z, c)
+                fake_traces = generator(z, c_onehot)
                 total_real.extend(traces.cpu().numpy())
                 total_fake.extend(fake_traces.detach().cpu().numpy())
-                total_c.extend(c.detach().cpu().numpy())
+                total_c.extend(c)
                 # Loss measures generator's ability to fool the discriminator
                 # Train on fake traces
                 fake_validity = discriminator(fake_traces, c)
                 g_loss = -torch.mean(fake_validity)
 
-                generator_loss_epoch += g_loss.item() / (len(dataloader) // args.n_critic)
-                g_loss.backward()
+                # compute f_loss
+                fake_traces_converted = fake_traces[:, 1:]
+                outputs = f_model(fake_traces_converted)
+                f_loss = criterion(outputs, c)
+
+                gf_loss = g_loss + f_loss
+
+                generator_g_loss_epoch += g_loss.item() / (len(dataloader) // args.n_critic)
+                generator_f_loss_epoch += f_loss.item() / (len(dataloader) // args.n_critic)
+
+                gf_loss.backward()
 
                 optimizer_G.step()
 
+        # Test DF accuracy
+        logger.debug("Test DF accuracy")
+        df_acc = test_DF_acc_epoch(f_model, total_fake, total_c)
+
         logger.info(
-            "[Epoch %2d/%2d] [D loss: %.4f] [G loss: %.4f] [w dist: %.4f]"
-            % (epoch + 1, args.n_epochs, discriminator_loss_epoch, generator_loss_epoch, w_dist_epoch)
+            "[Epoch %2d/%2d] [D loss: %.4f] [G loss: %.4f + %.4f] [DF acc: %.4f] [w dist: %.4f]"
+            % (epoch + 1, args.n_epochs, discriminator_loss_epoch, generator_g_loss_epoch, generator_f_loss_epoch,
+               df_acc, w_dist_epoch)
         )
+
         if (epoch == 0) or (epoch + 1) % args.freq == 0 or w_dist_epoch <= w_dist_threshold:
             # every args.freq epoch, checkpoint
             total_real = np.array(total_real)
@@ -189,11 +236,12 @@ if __name__ == '__main__':
             total_c = np.array(total_c).argmax(axis=1)
             total_real = scaler.inverse_transform(total_real)
             total_fake = scaler.inverse_transform(total_fake)
-            logger.debug("Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()),
-                                                                             int(total_fake.max())))
+            logger.debug(
+                "Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()),
+                                                                     int(total_fake.max())))
             np.savez_compressed(join(checkpointdir, "epoch_{}".format(epoch + 1)),
                                 x=total_real, recon_x=total_fake, label=total_c)
-        loss_checkpoints['generator'].append(generator_loss_epoch)
+        loss_checkpoints['generator'].append(generator_g_loss_epoch)
         loss_checkpoints['discriminator'].append(discriminator_loss_epoch)
         loss_checkpoints['dist'].append(w_dist_epoch)
         if w_dist_epoch <= w_dist_threshold:
@@ -209,23 +257,3 @@ if __name__ == '__main__':
     logger.info("Model saved at {}".format(modeldir))
     joblib.dump(scaler, join(modeldir, 'scaler.gz'))
     logger.info("Scaler saved at {}".format(modeldir))
-    # generator.eval()
-    # with torch.no_grad():
-    #     batch_size = args.batch_size
-    #     # generate some examples for each batch
-    #     samples = []
-    #     labels = []
-    #     for cls in range(class_dim):
-    #         z = Variable(Tensor(np.random.normal(0, 1, (batch_size, args.latent_dim))))
-    #         tmp = np.zeros((batch_size, class_dim))
-    #         tmp[:,cls] = 1
-    #         c = Variable(Tensor(tmp))
-    #         sample = generator(z, c).cpu().numpy()
-    #         sample = scaler.inverse_transform(sample)
-    #         samples.extend(sample)
-    #         labels.extend([cls]*batch_size)
-    #     samples = np.round(np.array(samples)).astype(int)
-    #     labels = np.array(labels)
-    #     fake_dict = {"feature":samples, "label":labels}
-    #     logger.info("fake shape:{} labels:{}".format(samples.shape, labels.shape))
-    #     np.save(join(checkpointdir, "fake.npy"), fake_dict)

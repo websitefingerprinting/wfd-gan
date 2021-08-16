@@ -76,6 +76,11 @@ if __name__ == '__main__':
     X = scaler.fit_transform(X)
     num_classes = class_dim = len(np.unique(y))  # index start from 0
 
+    # The first element is the number of bursts.
+    # To keep the burst-version DF as close to as the original pkt-version DF
+    # We remove this feature
+    X = X[:, 1:]
+
     if len(X.shape) < 3:
         X = X[:, np.newaxis, :]
     X = torch.from_numpy(X).float()
