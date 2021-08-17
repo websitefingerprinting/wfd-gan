@@ -16,6 +16,7 @@ logger = utils.init_logger('extract')
 # Set a very conservative value
 CUT_OFF_THRESHOLD = 10
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Extract burst sequences ipt from raw traces')
 
@@ -60,7 +61,7 @@ def get_burst(trace, fdir):
         if outlier_ind_last > 50:
             end = outlier_ind_last + 1
 
-    if start != 0 or end != len(bursts):
+    if start != 0 or end != len(trace):
         logger.warn("File {} trace has been truncated from {} to {}".format(fdir, start, end))
 
     trace = trace[start:end].copy()
