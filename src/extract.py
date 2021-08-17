@@ -44,8 +44,28 @@ def parse_arguments():
     return args
 
 
-def get_burst(trace):
-    # first remove the first few lines that are incoming packets
+def get_burst(trace, fdir):
+    # first check whether there are some outlier pkts based on the CUT_OFF_THRESHOLD
+    # If the outlier index is within 50, cut off the head
+    # else, cut off the tail
+    start, end = 0, len(trace)
+    ipt_burst = np.diff(trace[:, 0])
+    ipt_outlier_inds = np.where(ipt_burst > CUT_OFF_THRESHOLD)[0]
+
+    if len(ipt_outlier_inds) > 0:
+        outlier_ind_first = ipt_outlier_inds[0]
+        if outlier_ind_first < 50:
+            start = outlier_ind_first + 1
+        outlier_ind_last = ipt_outlier_inds[-1]
+        if outlier_ind_last > 50:
+            end = outlier_ind_last + 1
+
+    if start != 0 or end != len(bursts):
+        logger.warn("File {} trace has been truncated from {} to {}".format(fdir, start, end))
+
+    trace = trace[start:end].copy()
+
+    # remove the first few lines that are incoming packets
     start = -1
     for time, size in trace:
         start += 1
@@ -53,6 +73,8 @@ def get_burst(trace):
             break
 
     trace = trace[start:].copy()
+    trace[:, 0] -= trace[0, 0]
+    assert trace[0, 0] == 0
     burst_seqs = trace
 
     # merge bursts from the same direction
@@ -77,16 +99,7 @@ def get_burst(trace):
 
 def extract(trace, fdir):
     global length
-    burst_seq = get_burst(trace)
-
-    # time gap checking
-    ipt_burst = np.diff(burst_seq[:, 0])
-    ipt_outlier_inds = np.where(ipt_burst > CUT_OFF_THRESHOLD)[0]
-    if len(ipt_outlier_inds) > 0:
-        ipt_outlier_ind_first = ipt_outlier_inds[0]
-        logger.warn("File {} is truncated {:d}/{:d}".format(fdir, ipt_outlier_ind_first, len(burst_seq)))
-        burst_seq = burst_seq[:ipt_outlier_ind_first+1]
-        
+    burst_seq = get_burst(trace, fdir)
     times = burst_seq[:, 0]
     bursts = list(abs(burst_seq[:, 1]))
     bursts.insert(0, len(bursts))
