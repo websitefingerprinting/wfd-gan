@@ -68,7 +68,7 @@ if __name__ == '__main__':
     # Configure data loader
     X, y = utils.load_dataset(args.dir)
     logger.info("Loaded dataset:{}, min burst:{} max burst:{}, min label:{}, max label:{}"
-                .format(X.shape, X.min(), X.max(), y.min(), y.max()))
+                .format(X.shape, X[:, 1:].min(), X[:, 1:].max(), y.min(), y.max()))
     # reindex label starting from 0
     y -= y.min()
 
