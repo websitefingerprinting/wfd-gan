@@ -81,6 +81,18 @@ def test_DF_acc_epoch(model, X, y):
     return correct / total
 
 
+def my_clip(arr, max_burst_length, max_outgoing_size, max_incoming_size):
+    if arr[0] > max_burst_length:
+        arr[0] = max_burst_length
+    for i in range(1, len(arr), 2):
+        if arr[i] > max_outgoing_size:
+            arr[i] = max_outgoing_size
+    for i in range(2, len(arr), 2):
+        if arr[i] > max_incoming_size:
+            arr[i] = max_incoming_size
+    return arr
+
+
 if __name__ == '__main__':
     # argumments
     args, logger = parse_args()
@@ -95,6 +107,17 @@ if __name__ == '__main__':
                 .format(X.shape, X.min(), X.max(), y.min(), y.max()))
     # reindex label starting from 0
     y -= y.min()
+
+    # reset max for each feature
+    # The 95 percentile of burst len, outgoing, incoming are 1382, 75, 179, respectively
+    # this is computed over 100,000 traces in rimmer_top877 (each trace compute the max incoming, max outgoing)
+    MAX_BURST_LENGTH = 1382
+    MAX_OUTGOING_SIZE = 75
+    MAX_INCOMING_SIZE = 179
+    X = my_clip(X, MAX_BURST_LENGTH, MAX_OUTGOING_SIZE, MAX_INCOMING_SIZE)
+    assert X[:, 0].max() == MAX_BURST_LENGTH
+    assert X[:, 1::2].max() == MAX_OUTGOING_SIZE
+    assert X[:, 2::2].max() == MAX_INCOMING_SIZE
 
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)

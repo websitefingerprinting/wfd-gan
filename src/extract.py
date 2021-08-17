@@ -29,6 +29,11 @@ def parse_arguments():
                         default=1400,
                         help='Pad to length.'
                         )
+    parser.add_argument('--norm',
+                        type=bool,
+                        default=False,
+                        help='Shall we normalize burst sizes by dividing it with cell size?'
+                        )
     parser.add_argument('--format',
                         metavar='<file suffix>',
                         default=".pkt",
@@ -99,10 +104,13 @@ def get_burst(trace, fdir):
 
 
 def extract(trace, fdir):
-    global length
+    global length, norm
     burst_seq = get_burst(trace, fdir)
     times = burst_seq[:, 0]
-    bursts = list(abs(burst_seq[:, 1]))
+    bursts = abs(burst_seq[:, 1])
+    if norm:
+        bursts /= cm.CELL_SIZE
+    bursts = list(bursts)
     bursts.insert(0, len(bursts))
     bursts = bursts[:length] + [0] * (length - len(bursts))
     assert len(bursts) == length
@@ -130,10 +138,11 @@ def extractfeature(fdir):
 
 
 if __name__ == '__main__':
-    global MON_SITE_NUM, length
+    global MON_SITE_NUM, length, norm
     # parser config and arguments
     args = parse_arguments()
     length = args.length + 1  # add another feature as the real length of the trace
+    norm = args.norm
     logger.info("Arguments: %s" % (args))
     outputdir = join(cm.outputdir, os.path.split(args.dir.rstrip('/'))[1], 'feature')
     if not os.path.exists(outputdir):
