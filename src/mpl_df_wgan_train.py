@@ -122,7 +122,7 @@ if __name__ == '__main__':
         assert X[:, 1::2].max() == MAX_OUTGOING_SIZE
         assert X[:, 2::2].max() == MAX_INCOMING_SIZE
         np.savez_compressed(args.dir.split('.npz')[0] + '_clip.npz', features=X, labels=y)
-        logger.info("Save back  the clipped dataset to {}".format(args.dir.split('.npz') + '_clip.npz'))
+        logger.info("Save back  the clipped dataset to {}".format(args.dir.split('.npz')[0] + '_clip.npz'))
 
     # reindex label starting from 0
     y -= y.min()
@@ -159,8 +159,8 @@ if __name__ == '__main__':
     # Optimizers
     optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=args.lr)
     optimizer_D = torch.optim.RMSprop(discriminator.parameters(), lr=args.lr)
-    scheduler_G = lr_scheduler.StepLR(optimizer_G, step_size=50, gamma=0.1)
-    scheduler_D = lr_scheduler.StepLR(optimizer_D, step_size=50, gamma=0.1)
+    scheduler_G = lr_scheduler.StepLR(optimizer_G, step_size=100, gamma=0.5)
+    scheduler_D = lr_scheduler.StepLR(optimizer_D, step_size=100, gamma=0.5)
     # F model criterion
     criterion = nn.CrossEntropyLoss()
 
