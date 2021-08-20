@@ -1,3 +1,6 @@
+import os
+from os.path import join
+
 import torch
 from torch.autograd import Variable
 import torch.autograd as autograd
@@ -19,7 +22,7 @@ import common as cm
 '''For common usage'''
 
 
-def init_logger(name):
+def init_logger(name, log_dir=None):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     # create console handler and set level to debug
@@ -30,7 +33,23 @@ def init_logger(name):
     ch.setFormatter(formatter)
     # add ch to logger
     logger.addHandler(ch)
+
+    if log_dir is not None:
+        ch2 = logging.StreamHandler(open(log_dir, 'w'))
+        ch2.setFormatter(formatter)
+        logger.addHandler(ch2)
     return logger
+
+
+def init_directory(dir, tag=""):
+    basedir = os.path.split(os.path.split(dir)[0])[0]
+    modeldir = join(basedir, tag, 'model')
+    checkpointdir = join(basedir, tag, 'checkpoint')
+    if not os.path.exists(modeldir):
+        os.makedirs(modeldir)
+    if not os.path.exists(checkpointdir):
+        os.makedirs(checkpointdir)
+    return join(basedir, tag), modeldir, checkpointdir
 
 
 def read_conf(file):

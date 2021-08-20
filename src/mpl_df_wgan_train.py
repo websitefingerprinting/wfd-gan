@@ -2,6 +2,7 @@ import argparse
 import os
 from os.path import join
 from time import strftime
+import json
 
 import numpy as np
 import torch.optim
@@ -11,21 +12,19 @@ from torch.utils.data import DataLoader
 import torch.utils.data as Data
 from torch.autograd import Variable
 import torch.autograd as autograd
+from torch.optim import lr_scheduler
 from torchsummaryX import summary
 
 import common as cm
 from model import *
 import utils
 
-cuda = True if torch.cuda.is_available() else False
-device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
-
 k = 2
 p = 6
-w_dist_threshold = 0.01
+w_dist_threshold = -1
 
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
+Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+LongTensor = torch.cuda.LongTensor if torch.cuda.is_available() else torch.LongTensor
 
 MAX_BURST_LENGTH = 1382
 MAX_OUTGOING_SIZE = 75
@@ -35,6 +34,7 @@ MAX_INCOMING_SIZE = 179
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dir", required=True, help="Dataset directory.")
+    parser.add_argument("--clip", action="store_true", default=False, help="Whether to clip the burst size of the dataset before training")
     parser.add_argument("--f_model", type=str, required=True, help="The directory of the pre-trained DF.")
     parser.add_argument("--n_epochs", type=int, default=300, help="number of epochs of training")
     parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
@@ -42,22 +42,13 @@ def parse_args():
     parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
     parser.add_argument("--latent_dim", type=int, default=50, help="dimensionality of the latent space")
     parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
-    parser.add_argument("--alpha", type=float, default=1.0, help="Ratio of f loss")
+    parser.add_argument("--alpha_max", type=float, default=0.01, help="Max ratio of f loss")
+    parser.add_argument("--alpha_step", type=float, default=0.0004, help="alpha growth step size")
+    parser.add_argument("--alpha_freq", type=int, default=20, help="alpha value update frequency")
     parser.add_argument("--freq", type=int, default=20, help="Checkpoint every freq epochs")
+    parser.add_argument("--cuda_id", type=int, default=0, help="GPU ID")
     args = parser.parse_args()
-    logger = utils.init_logger('gan')
-    return args, logger
-
-
-def init_directory(dir, tag=""):
-    basedir = os.path.split(os.path.split(dir)[0])[0]
-    modeldir = join(basedir, tag, 'model')
-    checkpointdir = join(basedir, tag, 'checkpoint')
-    if not os.path.exists(modeldir):
-        os.makedirs(modeldir)
-    if not os.path.exists(checkpointdir):
-        os.makedirs(checkpointdir)
-    return join(basedir, tag), modeldir, checkpointdir
+    return args
 
 
 def test_DF_acc_epoch(model, X, y):
@@ -99,26 +90,42 @@ def my_clip(arr):
 
 if __name__ == '__main__':
     # argumments
-    args, logger = parse_args()
+    args = parse_args()
+
+    device = torch.device("cuda:{}".format(args.cuda_id) if (torch.cuda.is_available()) else "cpu")
+    if torch.cuda.is_available():
+        torch.cuda.set_device(args.cuda_id)  # id=0, 1, 2
+
     cf = utils.read_conf(cm.confdir)
-    logger.info(args)
     # create folder
-    pardir, modeldir, checkpointdir = init_directory(args.dir, tag='training_{}'.format(strftime('%m%d_%H%M%S')))
+    pardir, modeldir, checkpointdir = utils.init_directory(args.dir, tag='training_{}'.format(strftime('%m%d_%H%M%S')))
+    logger = utils.init_logger('gan', join(pardir, 'log.txt'))
+
+    logger.info(args)
     logger.debug("Output to {}".format(pardir))
+
+
+    # save parameters to file
+    with open(join(pardir, 'args.json'), 'wt') as f:
+        json.dump(vars(args), f, indent=4)
+
     # Configure data loader
     X, y = utils.load_dataset(args.dir)
     logger.info("Loaded dataset:{}, min burst:{} max burst:{}, min label:{}, max label:{}"
-                .format(X.shape, X[:,1:].min(), X[:,1:].max(), y.min(), y.max()))
-    # reindex label starting from 0
-    y -= y.min()
-
+                .format(X.shape, X[:, 1:].min(), X[:, 1:].max(), y.min(), y.max()))
     # reset max for each feature
     # The 95 percentile of burst len, outgoing, incoming are 1382, 75, 179, respectively
     # this is computed over 100,000 traces in rimmer_top877 (each trace compute the max incoming, max outgoing)
-    X = np.apply_along_axis(my_clip, 1, X)
-    assert X[:, 0].max() == MAX_BURST_LENGTH
-    assert X[:, 1::2].max() == MAX_OUTGOING_SIZE
-    assert X[:, 2::2].max() == MAX_INCOMING_SIZE
+    if args.clip:
+        X = np.apply_along_axis(my_clip, 1, X)
+        assert X[:, 0].max() == MAX_BURST_LENGTH
+        assert X[:, 1::2].max() == MAX_OUTGOING_SIZE
+        assert X[:, 2::2].max() == MAX_INCOMING_SIZE
+        np.savez_compressed(args.dir.split('.npz')[0] + '_clip.npz', features=X, labels=y)
+        logger.info("Save back  the clipped dataset to {}".format(args.dir.split('.npz') + '_clip.npz'))
+
+    # reindex label starting from 0
+    y -= y.min()
 
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)
@@ -152,12 +159,17 @@ if __name__ == '__main__':
     # Optimizers
     optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=args.lr)
     optimizer_D = torch.optim.RMSprop(discriminator.parameters(), lr=args.lr)
-
+    scheduler_G = lr_scheduler.StepLR(optimizer_G, step_size=50, gamma=0.1)
+    scheduler_D = lr_scheduler.StepLR(optimizer_D, step_size=50, gamma=0.1)
     # F model criterion
     criterion = nn.CrossEntropyLoss()
 
+    # alpha initialization
+    alpha = args.alpha_max
+
     loss_checkpoints = {'generator': [], 'discriminator': [], 'dist': []}
     for epoch in range(args.n_epochs):
+        logger.debug("Current lr: G {} D:{}".format(scheduler_G.get_last_lr(), scheduler_D.get_last_lr()))
         total_real = []
         total_fake = []
         total_c = []
@@ -174,8 +186,7 @@ if __name__ == '__main__':
 
             # ---------------------
             #  Train Discriminator
-            # ---------------------]
-
+            # ---------------------
             optimizer_D.zero_grad()
 
             # Sample noise as generator input
@@ -234,17 +245,29 @@ if __name__ == '__main__':
                 fake_validity = discriminator(fake_traces, c_onehot)
                 g_loss = -torch.mean(fake_validity)
 
-                # compute f_loss
-                fake_traces_converted = fake_traces[:, 1:]
-                fake_traces_converted = fake_traces_converted.reshape(fake_traces_converted.size(0), 1,
-                                                                      fake_traces_converted.size(1))
-                outputs = f_model(fake_traces_converted)
-                f_loss = criterion(outputs, c)
+                # We pick out those traces that the discriminator considered as real ones
+                # to ask f model whether they look like real ones from label c
+                fake_traces_seems_real = fake_traces[fake_validity[:, 0] > 0]
+                labels_seems_real = c[fake_validity[:, 0] > 0]
+                if len(fake_traces_seems_real) > 0:
+                    # logger.debug("We have {}/{} traces considered to be real in epoch {} step {}".format(
+                    # len(labels_seems_real), len(c), epoch, i))
+                    # Convert to CNN format, remove the first element which is the burst length
+                    fake_traces_converted = fake_traces_seems_real[:, 1:]
+                    fake_traces_converted = fake_traces_converted.reshape(fake_traces_converted.size(0), 1,
+                                                                          fake_traces_converted.size(1))
+                    # compute f_loss
+                    outputs = f_model(fake_traces_converted)
+                    f_loss = criterion(outputs, labels_seems_real)
+                    g_loss_combined = g_loss + alpha * f_loss
+                    f_loss_item = f_loss.item()
+                else:
+                    g_loss_combined = g_loss
+                    f_loss_item = 0
 
-                g_loss_combined = g_loss + args.alpha * f_loss
 
                 generator_g_loss_epoch += g_loss.item() / (len(dataloader) // args.n_critic)
-                generator_f_loss_epoch += f_loss.item() / (len(dataloader) // args.n_critic)
+                generator_f_loss_epoch += f_loss_item / (len(dataloader) // args.n_critic)
                 generator_loss_combined_epoch += g_loss_combined.item() / (len(dataloader) // args.n_critic)
 
                 g_loss_combined.backward()
@@ -255,10 +278,17 @@ if __name__ == '__main__':
         df_acc = test_DF_acc_epoch(f_model, total_fake, total_c)
 
         logger.info(
-            "[Epoch %2d/%2d] [D loss: %.4f] [G loss: %.4f + %.4f / %.4f] [DF acc: %.4f] [w dist: %.4f]"
-            % (epoch + 1, args.n_epochs, discriminator_loss_epoch, generator_g_loss_epoch, generator_f_loss_epoch,
-               generator_loss_combined_epoch, df_acc, w_dist_epoch)
+            "[Epoch %2d/%2d] [D loss: %.4f] [G loss: %.4f + %.4f * %.4f = %.4f] [DF acc: %.4f] [w dist: %.4f]"
+            % (epoch + 1, args.n_epochs, discriminator_loss_epoch, generator_g_loss_epoch, alpha,
+               generator_f_loss_epoch, generator_loss_combined_epoch, df_acc, w_dist_epoch)
         )
+
+        # update lr
+        scheduler_G.step()
+        scheduler_D.step()
+
+        # if epoch % args.alpha_freq == 0:
+        #     alpha = min(alpha + args.alpha_step, args.alpha_max)
 
         if (epoch == 0) or (epoch + 1) % args.freq == 0 or w_dist_epoch <= w_dist_threshold:
             # every args.freq epoch, checkpoint
@@ -268,8 +298,8 @@ if __name__ == '__main__':
             total_real = scaler.inverse_transform(total_real)
             total_fake = scaler.inverse_transform(total_fake)
             logger.debug(
-                "Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake.min()),
-                                                                     int(total_fake.max())))
+                "Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake[:, 1:].min()),
+                                                                     int(total_fake[:,1:].max())))
             np.savez_compressed(join(checkpointdir, "epoch_{}".format(epoch + 1)),
                                 x=total_real, recon_x=total_fake, label=total_c)
         loss_checkpoints['generator'].append(generator_g_loss_epoch)
