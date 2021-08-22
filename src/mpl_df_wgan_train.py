@@ -34,7 +34,8 @@ MAX_INCOMING_SIZE = 179
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dir", required=True, help="Dataset directory.")
-    parser.add_argument("--clip", action="store_true", default=False, help="Whether to clip the burst size of the dataset before training")
+    parser.add_argument("--clip", action="store_true", default=False,
+                        help="Whether to clip the burst size of the dataset before training")
     parser.add_argument("--f_model", type=str, required=True, help="The directory of the pre-trained DF.")
     parser.add_argument("--n_epochs", type=int, default=300, help="number of epochs of training")
     parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
@@ -104,7 +105,6 @@ if __name__ == '__main__':
     logger.info(args)
     logger.debug("Output to {}".format(pardir))
 
-
     # save parameters to file
     with open(join(pardir, 'args.json'), 'wt') as f:
         json.dump(vars(args), f, indent=4)
@@ -159,8 +159,7 @@ if __name__ == '__main__':
     # Optimizers
     optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=args.lr)
     optimizer_D = torch.optim.RMSprop(discriminator.parameters(), lr=args.lr)
-    scheduler_G = lr_scheduler.StepLR(optimizer_G, step_size=100, gamma=0.5)
-    scheduler_D = lr_scheduler.StepLR(optimizer_D, step_size=100, gamma=0.5)
+
     # F model criterion
     criterion = nn.CrossEntropyLoss()
 
@@ -169,7 +168,6 @@ if __name__ == '__main__':
 
     loss_checkpoints = {'generator': [], 'discriminator': [], 'dist': []}
     for epoch in range(args.n_epochs):
-        logger.debug("Current lr: G {} D:{}".format(scheduler_G.get_last_lr(), scheduler_D.get_last_lr()))
         total_real = []
         total_fake = []
         total_c = []
@@ -265,7 +263,6 @@ if __name__ == '__main__':
                     g_loss_combined = g_loss
                     f_loss_item = 0
 
-
                 generator_g_loss_epoch += g_loss.item() / (len(dataloader) // args.n_critic)
                 generator_f_loss_epoch += f_loss_item / (len(dataloader) // args.n_critic)
                 generator_loss_combined_epoch += g_loss_combined.item() / (len(dataloader) // args.n_critic)
@@ -283,10 +280,6 @@ if __name__ == '__main__':
                generator_f_loss_epoch, generator_loss_combined_epoch, df_acc, w_dist_epoch)
         )
 
-        # update lr
-        scheduler_G.step()
-        scheduler_D.step()
-
         # if epoch % args.alpha_freq == 0:
         #     alpha = min(alpha + args.alpha_step, args.alpha_max)
 
@@ -299,7 +292,7 @@ if __name__ == '__main__':
             total_fake = scaler.inverse_transform(total_fake)
             logger.debug(
                 "Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake[:, 1:].min()),
-                                                                     int(total_fake[:,1:].max())))
+                                                                     int(total_fake[:, 1:].max())))
             np.savez_compressed(join(checkpointdir, "epoch_{}".format(epoch + 1)),
                                 x=total_real, recon_x=total_fake, label=total_c)
         loss_checkpoints['generator'].append(generator_g_loss_epoch)

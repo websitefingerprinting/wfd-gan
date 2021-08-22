@@ -52,10 +52,10 @@ def init_directory(dir, tag=""):
     return join(basedir, tag), modeldir, checkpointdir
 
 
-def read_conf(file):
+def read_conf(file, sec='default'):
     cf = configparser.ConfigParser()
     cf.read(file)
-    return dict(cf['default'])
+    return dict(cf[sec])
 
 
 '''For GAN'''
