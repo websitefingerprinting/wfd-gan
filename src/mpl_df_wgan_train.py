@@ -21,7 +21,7 @@ import utils
 
 k = 2
 p = 6
-w_dist_threshold = -1
+w_dist_threshold = 0.05
 
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if torch.cuda.is_available() else torch.LongTensor
@@ -283,7 +283,7 @@ if __name__ == '__main__':
         # if epoch % args.alpha_freq == 0:
         #     alpha = min(alpha + args.alpha_step, args.alpha_max)
 
-        if (epoch == 0) or (epoch + 1) % args.freq == 0 or w_dist_epoch <= w_dist_threshold:
+        if (epoch == 0) or (epoch + 1) % args.freq == 0 or (w_dist_epoch <= w_dist_threshold and df_acc >= 0.9):
             # every args.freq epoch, checkpoint
             total_real = np.array(total_real)
             total_fake = np.array(total_fake)
@@ -298,8 +298,8 @@ if __name__ == '__main__':
         loss_checkpoints['generator'].append(generator_g_loss_epoch)
         loss_checkpoints['discriminator'].append(discriminator_loss_epoch)
         loss_checkpoints['dist'].append(w_dist_epoch)
-        if w_dist_epoch <= w_dist_threshold:
-            logger.info('Early stopping since the w-dist {} is less than {}.'.format(w_dist_epoch, w_dist_threshold))
+        if w_dist_epoch <= w_dist_threshold and df_acc >= 0.9:
+            logger.info('Early stopping since the w-dist = {}, df acc = {}.'.format(w_dist_epoch, df_acc))
             break
 
     np.savez_compressed(join(checkpointdir, "loss.npz".format(loss_checkpoints)),
