@@ -21,7 +21,7 @@ import utils
 
 k = 2
 p = 6
-w_dist_threshold = 0.05
+w_dist_threshold = 0.02
 
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if torch.cuda.is_available() else torch.LongTensor
@@ -37,14 +37,14 @@ def parse_args():
     parser.add_argument("--clip", action="store_true", default=False,
                         help="Whether to clip the burst size of the dataset before training")
     parser.add_argument("--f_model", type=str, required=True, help="The directory of the pre-trained DF.")
-    parser.add_argument("--n_epochs", type=int, default=300, help="number of epochs of training")
+    parser.add_argument("--n_epochs", type=int, default=600, help="number of epochs of training")
     parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
     parser.add_argument("--lr", type=float, default=0.0002, help="learning rate")
     parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
     parser.add_argument("--latent_dim", type=int, default=50, help="dimensionality of the latent space")
     parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
-    parser.add_argument("--alpha_max", type=float, default=0.01, help="Max ratio of f loss")
-    parser.add_argument("--alpha_step", type=float, default=0.0004, help="alpha growth step size")
+    parser.add_argument("--alpha_max", type=float, default=0.02, help="Max ratio of f loss")
+    parser.add_argument("--alpha_step", type=float, default=0.0005, help="alpha growth step size")
     parser.add_argument("--alpha_freq", type=int, default=20, help="alpha value update frequency")
     parser.add_argument("--freq", type=int, default=20, help="Checkpoint every freq epochs")
     parser.add_argument("--cuda_id", type=int, default=0, help="GPU ID")
@@ -145,7 +145,8 @@ if __name__ == '__main__':
     )
 
     # Initialize generator and discriminator
-    generator = Generator(seq_len, class_dim, args.latent_dim)
+    generator = Generator(seq_len, class_dim, args.latent_dim, scaler_min=scaler.data_min_[0],
+                          scaler_max=scaler.data_max_[0], is_gpu=torch.cuda.is_available())
     discriminator = Discriminator(seq_len, class_dim)
     f_model = DF(seq_len - 1, class_dim)  # remove the number_of_burst feature, so #feature - 1
     f_model.load_state_dict(torch.load(args.f_model, map_location=device))
@@ -280,8 +281,8 @@ if __name__ == '__main__':
                generator_f_loss_epoch, generator_loss_combined_epoch, df_acc, w_dist_epoch)
         )
 
-        # if epoch % args.alpha_freq == 0:
-        #     alpha = min(alpha + args.alpha_step, args.alpha_max)
+        if epoch % args.alpha_freq == 0:
+            alpha = min(alpha + args.alpha_step, args.alpha_max)
 
         if (epoch == 0) or (epoch + 1) % args.freq == 0 or (w_dist_epoch <= w_dist_threshold and df_acc >= 0.9):
             # every args.freq epoch, checkpoint
@@ -290,9 +291,9 @@ if __name__ == '__main__':
             total_c = np.array(total_c)
             total_real = scaler.inverse_transform(total_real)
             total_fake = scaler.inverse_transform(total_fake)
-            logger.debug(
-                "Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake[:, 1:].min()),
-                                                                     int(total_fake[:, 1:].max())))
+            # logger.debug(
+            #     "Get {} samples, min burst:{}, max burst: {}".format(total_fake.shape[0], int(total_fake[:, 1:].min()),
+            #                                                          int(total_fake[:, 1:].max())))
             np.savez_compressed(join(checkpointdir, "epoch_{}".format(epoch + 1)),
                                 x=total_real, recon_x=total_fake, label=total_c)
         loss_checkpoints['generator'].append(generator_g_loss_epoch)

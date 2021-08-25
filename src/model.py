@@ -8,11 +8,14 @@ from torchsummaryX import summary
 
 
 class Generator(nn.Module):
-    def __init__(self, seq_size, class_dim, latent_dim):
+    def __init__(self, seq_size, class_dim, latent_dim, scaler_min, scaler_max, is_gpu=False):
         super(Generator, self).__init__()
         self.seq_size = seq_size
         self.class_dim = class_dim
         self.latent_dim = latent_dim
+        self.LongTensor = torch.cuda.LongTensor if is_gpu else torch.LongTensor
+        self.scaler_min = scaler_min
+        self.scaler_max = scaler_max
 
         def block(in_feat, out_feat, normalize=True):
             layers = [nn.Linear(in_feat, out_feat)]
@@ -23,7 +26,7 @@ class Generator(nn.Module):
 
         self.model = nn.Sequential(
             *block(self.latent_dim + self.class_dim, 512, normalize=False),
-            # *block(256, 512),
+            # *block(512, 512),
             *block(512, 1024),
             *block(1024, 2048),
             nn.Linear(2048, self.seq_size),
@@ -33,6 +36,15 @@ class Generator(nn.Module):
     def forward(self, z, c):
         input = torch.cat([z, c], 1)
         trace = self.model(input)
+
+        # 1) mask the tail of each trace according to the first element which is the learned burst seq length
+        # https://discuss.pytorch.org/t/set-value-of-torch-tensor-up-to-some-index/102097
+        burst_length = trace[:, 0] * (self.scaler_max - self.scaler_min) + self.scaler_min
+        mask = torch.zeros_like(trace)
+        mask[(torch.arange(trace.shape[0]), burst_length.type(self.LongTensor) + 1)] = 1
+        mask = 1 - mask.cumsum(dim=-1)
+
+        trace = trace * mask
         return trace
 
 
