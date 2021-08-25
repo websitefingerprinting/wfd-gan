@@ -165,7 +165,7 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
 
     # alpha initialization
-    alpha = args.alpha_max
+    alpha = 0
 
     loss_checkpoints = {'generator': [], 'discriminator': [], 'dist': []}
     for epoch in range(args.n_epochs):
