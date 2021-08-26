@@ -21,7 +21,7 @@ import utils
 
 k = 2
 p = 6
-w_dist_threshold = 0.02
+w_dist_threshold = 0.05
 
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if torch.cuda.is_available() else torch.LongTensor
