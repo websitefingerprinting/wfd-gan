@@ -372,12 +372,12 @@ if __name__ == '__main__':
     if args.mode == 'random':
         np.save(join(output_dir, 'num.npy'), nums)
 
-    # l = parallel(output_dir, eval(args.noise), mergedTrace, 20)
-    l = []
-    cnt = 0
-    for T in mergedTrace:
-        l.append(MergePad2(output_dir,  str(cnt), eval(args.noise), T))
-        cnt += 1
+    l = parallel(output_dir, eval(args.noise), mergedTrace, 20)
+    # l = []
+    # cnt = 0
+    # for T in mergedTrace:
+    #     l.append(MergePad2(output_dir,  str(cnt), eval(args.noise), T))
+    #     cnt += 1
 
     with open(join(output_dir, 'list'), 'w') as f:
         [f.write(label + '\n') for label in l]
