@@ -13,5 +13,5 @@ for m in range(2, 17):
           "--ipt dump/rimmer_top877_2000/training_0826_195223/time_feature_0-100x0-1000_o2i.ipt " \
           "dump/rimmer_top877_2000/training_0826_195223/time_feature_0-100x0-1000_o2o.ipt" + \
           "-n " + str(n) + " -m " + str(m) + " -b 10 --noise True --mode fix"
-    print(cmd)
-    # subprocess.call(cmd, shell=True)
+    # print(cmd)
+    subprocess.call(cmd, shell=True)
