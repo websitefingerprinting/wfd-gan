@@ -135,3 +135,14 @@ def poolcontext(*args, **kwargs):
     pool = mp.Pool(*args, **kwargs)
     yield pool
     pool.terminate()
+
+
+def load_log_ipt(fdir):
+    """Load .ipt file to a list
+    The default format is one line comment + std + data
+    The returned is the kernel std + ipt in log scale
+    """
+    with open(fdir, 'r') as f:
+        lines = f.readlines()[1:]
+        data = np.array(pd.Series(lines).str.slice(0, -1)).astype(float)
+    return data

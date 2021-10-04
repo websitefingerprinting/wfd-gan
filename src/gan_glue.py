@@ -24,7 +24,7 @@ model_name_pattern = "generator_seqlen([0-9]*)_cls([0-9]*)_latentdim([0-9]*).ckp
 # np.random.seed(1123)
 
 def load_trace(fname, t=999):
-    '''load a trace from fpath/fname up to t time.'''
+    """load a trace from fpath/fname up to t time."""
     '''return trace and its name: cls-inst'''
     label = fname
 
@@ -42,7 +42,7 @@ def load_trace(fname, t=999):
 
 
 def weibull(k=0.75):
-    return np.random.weibull(0.75)
+    return np.random.weibull(k)
 
 
 def dump(trace, fpath):
@@ -70,33 +70,36 @@ def est_iat(trace):
     return np.random.uniform(np.percentile(itas, 20), np.percentile(itas, 80))
 
 
+def expand_trace(burst_seq):
+    trace = []
+    for time, burst in burst_seq:
+        for _ in range(abs(int(burst))):
+            trace.append([time, np.sign(burst)])
+    return np.array(trace)
+
+
 def syn_trace(cind, duration):
     global ipt_sampler
     # first generate a burst sequence
     synthesized_x = query_from_gan(cind)
-    cur_t = 0
-    res = []
-    last_sign = 1
-    while cur_t < duration:
-        if len(synthesized_x) == 0:
-            synthesized_x = query_from_gan(cind)
-        cell = synthesized_x.pop(0)
-        cur_sign = np.sign(cell)
-        if last_sign > 0 and cur_sign > 0:
-            ipt_type = 'o2o'
-        elif last_sign > 0 and cur_sign < 0:
-            ipt_type = 'o2i'
-        elif last_sign < 0 and cur_sign > 0:
-            ipt_type = 'i2o'
-        elif last_sign < 0 and cur_sign < 0:
-            ipt_type = 'i2i'
-        ipt = ipt_sampler.sample(ipt_type)
-        cur_t = cur_t + ipt
-        res.append([cur_t, cell])
-        last_sign = cur_sign
-    res = np.array(res)
-    res[:, 0] -= res[0, 0]
+    outgoing_bursts = synthesized_x[synthesized_x > 0]
+    incoming_bursts = synthesized_x[synthesized_x < 0]
+
+    sampled_o2o_ipt = ipt_sampler.sample('o2o', len(outgoing_bursts))
+    sampled_outgoing_ts = np.cumsum(sampled_o2o_ipt) - sampled_o2o_ipt[0]
+    sampled_o2i_ipt = ipt_sampler.sample('o2i', len(incoming_bursts))
+    sampled_incoming_ts = sampled_outgoing_ts + sampled_o2i_ipt
+
+    outgoing_ts_bursts = np.stack((sampled_outgoing_ts, outgoing_bursts), axis=-1)
+    incoming_ts_bursts = np.stack((sampled_incoming_ts, incoming_bursts), axis=-1)
+
+    res = np.concatenate((outgoing_ts_bursts, incoming_ts_bursts), axis=0)
+    res = res[res[:, 0].argsort(kind="mergesort")]
+    res = res[res[:, 0] <= duration]
+    res = expand_trace(res)
+
     return res
+
 
 def query_from_gan(cind):
     global model, latent_dim, scaler, cls_num
@@ -114,19 +117,11 @@ def query_from_gan(cind):
         synthesized_x = np.trim_zeros(synthesized_x, trim='b')
         if len(synthesized_x) % 2 == 1:
             synthesized_x = synthesized_x[:-1]
-        synthesized_x[synthesized_x<=0] = 1
+        synthesized_x[synthesized_x <= 0] = 1
         assert len(synthesized_x) % 2 == 0
-    # expand bursts
-    res = []
-    for i, burst in enumerate(synthesized_x):
-        if i % 2 == 0:
-            cur_sign = 1
-        else:
-            cur_sign = -1
-        for _ in range(burst):
-            res.append(1 * cur_sign)
-    return res
-
+    sign_arr = np.tile([1, -1], len(synthesized_x) // 2)
+    synthesized_x = sign_arr * synthesized_x
+    return synthesized_x
 
 
 def MergePad2(output_dir, outputname, noise, mergelist=None, waiting_time=10):
@@ -204,6 +199,7 @@ def parse_arguments():
                         help='Dir of the trained gan model.(The parent folder)')
     parser.add_argument('--ipt',
                         type=str,
+                        nargs='+',
                         help='Dir of the saved IPT file (i.e., ./kde/cdf.npy).')
     parser.add_argument('--noise',
                         type=str,
@@ -234,7 +230,11 @@ def parse_arguments():
                         dest="log",
                         metavar='<log path>',
                         default='stdout',
-                        help='path to the log file. It will print to stdout by default.')
+                        help='Path to the log file. It will print to stdout by default.')
+    parser.add_argument('--format',
+                        type=str,
+                        default='.cell',
+                        help='the suffix of files in the args.dir')
 
     args = parser.parse_args()
 
@@ -296,32 +296,32 @@ def work(param):
 
 
 class IPT_Sampler:
-    def __init__(self, cdfs):
-        self.cdfs = cdfs # 4 cdf: o2o, o2i, i2o, i2i
+    def __init__(self, ipt_dirs):
+        for ipt_dir in ipt_dirs:
+            if 'o2o' in ipt_dir:
+                self.o2o_data = utils.load_log_ipt(ipt_dir)
+            elif 'o2i' in ipt_dir:
+                self.o2i_data = utils.load_log_ipt(ipt_dir)
+            else:
+                raise ValueError("Please specify ipt type (o2o or o2i) in the file names: {}".format(ipt_dirs))
 
-    def sample(self, cdf_type):
+    def sample(self, cdf_type, num):
         # sample a random number from one type of distribution
         if cdf_type == 'o2o' or cdf_type == 0:
-            return self.sample_('o2o')
+            return self.sample_(self.o2o_data, num)
         elif cdf_type == 'o2i' or cdf_type == 1:
-            return self.sample_('o2i')
-        elif cdf_type == 'i2o' or cdf_type == 2:
-            return self.sample_('i2o')
-        elif cdf_type == 'i2i' or cdf_type == 3:
-            return self.sample_('i2i')
+            return self.sample_(self.o2i_data, num)
         else:
             raise ValueError("Wrong cdf type:{}".format(cdf_type))
-            return None
 
-    def sample_(self, cdf_index):
-        x, cdf = self.cdfs[cdf_index]
-        y = np.random.uniform(0.0001, 1)  # use 0.0001 to avoid exception next line
-        y0, y1 = cdf[cdf <= y][-1], cdf[cdf >= y][0]
-        x0, x1 = x[cdf <= y][-1], x[cdf >= y][0]
-        if y0 == y1:
-            return 10 ** ((x0 + x1) / 2)
-        else:
-            return 10 ** ((y - y0) / (y1 - y0) * (x1 - x0) + x0)
+    def sample_(self, data, num):
+        """KDE sampler, the first element is kernel std
+        The rest are ipt data in log scale"""
+        std = data[0]
+        sampled_log_ipt = np.random.choice(data[1:], num) + std * np.random.randn(num)
+        sampled_ipt = 10 ** sampled_log_ipt
+        sampled_ipt[sampled_ipt > 0.5] = 0.5
+        return sampled_ipt
 
 
 if __name__ == '__main__':
@@ -342,40 +342,42 @@ if __name__ == '__main__':
         UNMON_SITE_NUM = 0
 
     # load model
+    scaler_dir = glob.glob(join(args.model, "scaler.gz"))[0]
+    scaler = joblib.load(scaler_dir)
+
     model_dir = glob.glob(join(args.model, "generator*.ckpt"))[0]
     pattern = re.compile(model_name_pattern)
     m = pattern.match(model_dir.split("/")[-1])
     seqlen, cls_num, latent_dim = int(m.group(1)), int(m.group(2)), int(m.group(3))
-    model = Generator(seqlen, cls_num, latent_dim).to(device)
+    model = Generator(seqlen, cls_num, latent_dim, scaler_min=scaler.data_min_[0],
+                          scaler_max=scaler.data_max_[0], is_gpu=torch.cuda.is_available()).to(device)
     model.load_state_dict(torch.load(model_dir, map_location=device))
 
-    scaler_dir = glob.glob(join(args.model, "scaler.gz"))[0]
-    scaler = joblib.load(scaler_dir)
+
     logger.info("Model loaded.")
 
     # build ipt sampler
-    ipt_dict = np.load(args.ipt, allow_pickle=True).item()
-    ipt_sampler = IPT_Sampler(ipt_dict)
+    ipt_sampler = IPT_Sampler(args.ipt)
 
-    list_names = glob.glob(join(args.dir, '*'))
+    list_names = glob.glob(join(args.dir, '*' + args.format))
     if args.mode == 'fix':
         mergedTrace = CreateMergedTrace(args.dir, list_names, args.n, args.m, args.b)
     elif args.mode == 'random':
         mergedTrace, nums = CreateRandomMergedTrace(args.dir, list_names, args.n, args.m, args.b)
     else:
-        logger.error("Wrong mode :{}".format(args.mode))
+        raise ValueError("Wrong mode :{}".format(args.mode))
 
     # Init run directories
     output_dir = init_directories()
     if args.mode == 'random':
         np.save(join(output_dir, 'num.npy'), nums)
 
-    l = parallel(output_dir, eval(args.noise), mergedTrace, 20)
-    # l = []
-    # cnt = 0
-    # for T in mergedTrace:
-    #     l.append(MergePad2(output_dir,  str(cnt) , eval(args.noise), T))
-    #     cnt += 1
+    # l = parallel(output_dir, eval(args.noise), mergedTrace, 20)
+    l = []
+    cnt = 0
+    for T in mergedTrace:
+        l.append(MergePad2(output_dir,  str(cnt), eval(args.noise), T))
+        cnt += 1
 
     with open(join(output_dir, 'list'), 'w') as f:
         [f.write(label + '\n') for label in l]
