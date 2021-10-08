@@ -156,7 +156,7 @@ if __name__ == '__main__':
         logger.info("Epoch [{}/{}] train acc: {:.4f} val accuracy: {:.4f}".format(
             epoch + 1, num_epochs, correct_train / total_train ,correct_test / total_test))
 
-    fname = args.dir.split('/')[-1].split('.')[0]
+    fname = args.dir.split('/')[-3]
     model_saved_path = join(cm.dModelDir, 'df_{}.ckpt'.format(fname))
     torch.save(model.state_dict(), model_saved_path)
     logger.info("Model is saved to {}".format(model_saved_path))
