@@ -123,10 +123,14 @@ def prepare_dataset(features, labels, config):
     return np.array(X), np.array(y)
 
 
-def loadTrace(fdir):
+def loadTrace(fdir, norm_cell=False):
     with open(fdir, 'r') as f:
         tmp = f.readlines()
     trace = np.array(pd.Series(tmp).str.slice(0, -1).str.split("\t", expand=True).astype(float))
+    if norm_cell:
+        # in case we feed in defended traces that
+        # use +-888 to represent a dummy packet
+        trace[:, 1] = np.sign(trace[:, 1])
     return trace
 
 

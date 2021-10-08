@@ -34,6 +34,11 @@ def parse_arguments():
                         default=False,
                         help='Shall we normalize burst sizes by dividing it with cell size?'
                         )
+    parser.add_argument('--norm_cell',
+                        type=bool,
+                        default=False,
+                        help='Shall we ignore the value of a cell (e.g., +-888 -> +-1)?'
+                        )
     parser.add_argument('--format',
                         metavar='<file suffix>',
                         default=".pkt",
@@ -126,9 +131,9 @@ def parallel(flist, n_jobs=70):
 
 
 def extractfeature(fdir):
-    global MON_SITE_NUM
+    global MON_SITE_NUM, norm_cell
     fname = fdir.split('/')[-1].split(".")[0]
-    trace = utils.loadTrace(fdir)
+    trace = utils.loadTrace(fdir, norm_cell=norm_cell)
     bursts, times = extract(trace, fdir)
     if '-' in fname:
         label = int(fname.split('-')[0])
@@ -138,11 +143,12 @@ def extractfeature(fdir):
 
 
 if __name__ == '__main__':
-    global MON_SITE_NUM, length, norm
+    global MON_SITE_NUM, length, norm, norm_cell
     # parser config and arguments
     args = parse_arguments()
     length = args.length + 1  # add another feature as the real length of the trace
     norm = args.norm
+    norm_cell = args.norm_cell
     logger.info("Arguments: %s" % (args))
     outputdir = join(cm.outputdir, os.path.split(args.dir.rstrip('/'))[1], 'feature')
     if not os.path.exists(outputdir):
