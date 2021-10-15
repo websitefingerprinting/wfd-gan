@@ -12,6 +12,7 @@ import utils
 import common as cm
 from model import Generator
 from extract import get_burst
+import multiprocessing
 
 device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 DUMMY_CODE = 888
@@ -116,7 +117,7 @@ def init():
     return args, logger, cf, outputdir, flist
 
 
-def simulate_trace(fdir, wtgan_model, outputdir):
+def simulate_trace(fdir, outputdir):
     fname = os.path.split(fdir)[1]
     saved_dir = join(outputdir, fname)
     np.random.seed(datetime.datetime.now().microsecond)
@@ -124,17 +125,17 @@ def simulate_trace(fdir, wtgan_model, outputdir):
     try:
         trace = utils.loadTrace(fdir)
         real_bursts = abs(get_burst(trace, fdir))
+        wtgan = WTGAN(args.model)
         # we did have some inaccuracy issue here since we cant simulate the
         # timestamps of each cell in a burst
         # we use the same timestamp for one burst here
         real_burst_ind = 0
         fake_burst_ind = 0
         merged_bursts = []
-        fake_bursts = wtgan_model.get_ref_trace()
+        fake_bursts = wtgan.get_ref_trace()
         while real_burst_ind < len(real_bursts):
             if fake_burst_ind >= len(fake_bursts):
-                print("Resample a trace")
-                fake_bursts = wtgan_model.get_ref_trace()
+                fake_bursts = wtgan.get_ref_trace()
                 fake_burst_ind = 0
 
             real_time, real_burst = real_bursts[real_burst_ind]
@@ -157,6 +158,6 @@ def simulate_trace(fdir, wtgan_model, outputdir):
 if __name__ == '__main__':
     args, logger, cf, outputdir, flist = init()
     logger.info('To simulate {} files, results are output to {}'.format(len(flist), outputdir))
-    wtgan = WTGAN(args.model)
-    with utils.poolcontext(args.n_cpu) as p:
-        p.map(partial(simulate_trace, wtgan_model=wtgan, outputdir=outputdir), flist)
+    with multiprocessing.Pool(args.n_cpu) as p:
+        p.map(partial(simulate_trace, outputdir=outputdir), flist)
+
