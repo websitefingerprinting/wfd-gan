@@ -26,10 +26,14 @@ w_dist_threshold = 0.05
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if torch.cuda.is_available() else torch.LongTensor
 
-MAX_BURST_LENGTH = 1382
-MAX_OUTGOING_SIZE = 75
-MAX_INCOMING_SIZE = 179
+# MAX_BURST_LENGTH = 1382
+# MAX_OUTGOING_SIZE = 75
+# MAX_INCOMING_SIZE = 179
 
+# for walkie-talkie
+MAX_BURST_LENGTH = 550
+MAX_OUTGOING_SIZE = 13
+MAX_INCOMING_SIZE = 122
 
 def parse_args():
     parser = argparse.ArgumentParser()

@@ -72,7 +72,7 @@ def get_burst(trace, fdir):
             end = outlier_ind_last + 1
 
     if start != 0 or end != len(trace):
-        logger.warn("File {} trace has been truncated from {} to {}".format(fdir, start, end))
+        print("File {} trace has been truncated from {} to {}".format(fdir, start, end))
 
     trace = trace[start:end].copy()
 
