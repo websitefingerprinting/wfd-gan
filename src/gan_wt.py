@@ -159,4 +159,4 @@ if __name__ == '__main__':
     logger.info('To simulate {} files, results are output to {}'.format(len(flist), outputdir))
     wtgan = WTGAN(args.model)
     with utils.poolcontext(args.n_cpu) as p:
-        p.map(partial(simulate_trace, wtgan=wtgan, outputdir=outputdir), flist)
+        p.map(partial(simulate_trace, wtgan_model=wtgan, outputdir=outputdir), flist)
