@@ -210,3 +210,8 @@ class DF(nn.Module):
         for i in range(4):
             res = int(np.ceil(res / 8))
         return res
+
+
+if __name__ == '__main__':
+    generator = Generator(1400, 100, 500, 0, 100, is_gpu=False)
+    summary(generator, torch.zeros((32, 500)), c=torch.zeros(32, 100))
