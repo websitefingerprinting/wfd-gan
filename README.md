@@ -1,4 +1,7 @@
-# Boosting Website Fingerprinting Defenses with Generative Adversarial Network
+# Surakav: Generating Realistic Traces for a Strong Website Fingerprinting Defense
+<div >
+<img src="https://img.shields.io/badge/Surakav-1.0.0-brightgreen.svg?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAlAAAAJQBeb8N7wAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAD+SURBVDiNndO/SgNBEMfxz4ZELEyhNoJ2lqksI1Y2PoEKNoKN4AMIvoC9IJY+gg+gmMZeULDyGRQEFfwTx8K7cIE7ucvAwDI7v+/Ozu6kiFDXUkpdLETE4ygYEbUcy7jANPZwiUFd8QaecYJ7ROZbZcnz6GTrhCMMC6LcT9EqChdxgC/cYh2DEmFkVbQiQjul1MMSZvCND6zguqKXD+hHxE9pE7FTcWrgBr2x/IqmnZWIj/Oy6wA6JfdfK8395+lmcVUAnDcCFEC7eMcruo0BGeQwq2J/UkA/A9xNCpjCE96wWtxrV3yWMYuIz5TSJrb9DdPIUsNxnsMwIl7y2C/QuaOo70VRKQAAAABJRU5ErkJggg==">
+</div>
 
 ## What?
 This is the repository for training the trace generator. We mainly introduce the usage of the code as below. 
