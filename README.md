@@ -10,6 +10,7 @@ This is only for research purpose, so use carefully.
 ## How to use
 
 ### Feature extraction
+First modify `conf.ini` (only `MONITORED_SITE_NUM` and `MONITORED_INST_NUM` matters).
 The raw traces must be in the **cell sequence** format or **packet sequence** format where each file has two columns:
 the first column lists the timestamps and the second column lists the direction (+-1) or the directional bytes (+-bytes). 
 We extract features in the **burst sequence** format, that is, a sequence of +-N representing the size of a burst (N is the number of cells). 
@@ -53,4 +54,4 @@ To sample a time gap from the distribution is equivalent to compute
 t + normal(0,1) * kernel_std, 
 ```
 where *t* is randomly sampled from the 1,000,000 time gaps. 
-Remember to convert back to seconds from the log values. 
+Remember to convert back to second from the log values. 
