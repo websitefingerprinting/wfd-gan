@@ -93,7 +93,8 @@ if __name__ == '__main__':
     )
 
     # Initialize generator and discriminator
-    generator = Generator(seq_len, class_dim, args.latent_dim)
+    generator = Generator(seq_len, class_dim, args.latent_dim, scaler_min=scaler.data_min_[0],
+                          scaler_max=scaler.data_max_[0], is_gpu=torch.cuda.is_available())
     discriminator = Discriminator(seq_len, class_dim)
     generator.to(device)
     discriminator.to(device)

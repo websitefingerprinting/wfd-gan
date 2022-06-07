@@ -107,7 +107,8 @@ class WFGAN:
         model_path = model_path_list[0]
         info = re.match(cm.GENERATOR_NAME_REG, model_path.split('/')[-1])
         scaler = joblib.load(scaler_path)
-        model = Generator(int(info['seqlen']), int(info['cls']), int(info['latentdim'])).to(device)
+        model = Generator(int(info['seqlen']), int(info['cls']), int(info['latentdim']), scaler_min=scaler.data_min_[0],
+                          scaler_max=scaler.data_max_[0], is_gpu=torch.cuda.is_available()).to(device)
         model.load_state_dict(torch.load(model_path, map_location=device))
         self.scaler = scaler
         self.model = model
@@ -323,6 +324,7 @@ def simulate(fdir, wfgan, outputdir):
         incoming_defended = process_incoming(wfgan, outgoing_burst_seqs, old_cum_outgoing_num, trace[trace[:, 1] < 0], ref_trace)
         trace_defended = np.concatenate((outgoing_defended, incoming_defended), axis=0)
         trace_defended = trace_defended[trace_defended[:, 0].argsort()]
+        trace_defended[:, 0] -= trace_defended[0, 0]
         fname = fdir.split('/')[-1]
         with open(join(outputdir, fname), 'w') as f:
             for time, direction in trace_defended:
