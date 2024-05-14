@@ -7,6 +7,11 @@
 This is the repository for training the trace generator. We mainly introduce the usage of the code as below. 
 This is only for research purpose, so use carefully.
 
+## ⚠️ Important Notice
+I have removed my Surakav simulation code from this repository as it was written during my preliminary trial.
+The simulation of Surakav is **rather inaccurate** and will lead to misleading results.
+It is not recommended to use the simulation code to draw any conclusion.
+
 ## How to use
 
 ### Feature extraction
